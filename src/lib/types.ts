@@ -24,18 +24,21 @@ export interface IncorporationDetails {
   price?: number; // Base price of the selected jurisdiction/state/companyType combination
 
   packageName?: string; // e.g., 'Basic', 'Standard', 'Premium'
-  // packagePrice is derived from incorporationPackages in Step2SelectServices
 
-  // Store all AI recommendations
   aiBestRecommendation?: IncorporationRecommendationItem | null;
   aiAlternativeRecommendations?: IncorporationRecommendationItem[];
+
+  aiRecommendedJurisdiction?: string;
+  aiRecommendedState?: string;
+  aiRecommendedCompanyType?: string;
+  aiRecommendedReasoning?: string;
 }
 
 export interface BankingAssistance {
   selected?: boolean;
   option?: string;
   price?: number;
-  reasoning?: string; // Reasoning for suggesting banking, can be from AI or generic
+  reasoning?: string;
 }
 
 export interface AddOn {
@@ -78,16 +81,19 @@ export interface Address {
   country?: string;
 }
 
+export interface NeedsAssessment {
+  region?: string;
+  businessActivities?: string[]; // Changed from purpose (string)
+  otherBusinessActivity?: string; // New field
+  strategicObjectives?: string[]; // Changed from priorities (string)
+  otherStrategicObjective?: string; // New field
+  businessDescription?: string; // Optional detailed description
+}
+
 export interface OrderData {
   userEmail?: string;
   userPhone?: string;
-  needsAssessment?: {
-    purpose?: string;
-    priorities?: string;
-    region?: string;
-    // bankingIntent?: boolean; // Removed
-    businessDescription?: string;
-  };
+  needsAssessment?: NeedsAssessment;
   incorporation?: IncorporationDetails;
   bankingAssistance?: BankingAssistance;
   addOns?: AddOn[];
@@ -186,15 +192,10 @@ export const US_COMPANY_TYPES_LIST = [
 ];
 
 export const INTERNATIONAL_COMPANY_TYPES_LIST = [
-  'Company Limited', // General term, often UK/Commonwealth
-  'Limited Liability Company', // Can exist internationally, e.g., UAE LLC
-  'International Business Company', // Common in offshore jurisdictions like BVI, Seychelles
-  'Private Limited Company', // e.g., Singapore Pte. Ltd., UK Ltd.
-  'Public Limited Company', // e.g., UK PLC
-  'Limited by Shares', // A fundamental type, often part of other names
-  'Global Business Company', // Mauritius specific
-  'Authorised Company', // Mauritius specific
-  'Limited Liability Partnership', // e.g., UK LLP
-  'Exempted Company', // e.g., Cayman Islands
-  'Corporation' // Generic, can exist outside US, often for larger entities
+  'Company Limited', 'Limited Liability Company', 'International Business Company',
+  'Private Limited Company', 'Public Limited Company', 'Limited by Shares',
+  'Global Business Company', 'Authorised Company', 'Limited Liability Partnership',
+  'Exempted Company', 'Corporation'
 ];
+// Removed 'International investments' and 'International company' as they seemed too generic or redundant with IBC
+

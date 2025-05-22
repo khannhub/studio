@@ -15,16 +15,23 @@ import {z} from 'genkit';
 import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, type IncorporationRecommendationItem } from '@/lib/types';
 
 const RecommendIncorporationInputSchema = z.object({
-  businessPurpose: z
+  businessActivities: z
+    .array(z.string())
+    .describe('A list of main business activities of the company.'),
+  otherBusinessActivity: z
     .string()
-    .describe('The purpose of the business or company.'),
-  priorities: z
-    .string()
+    .optional()
+    .describe('Specific business activity if "Other" was selected.'),
+  strategicObjectives: z
+    .array(z.string())
     .describe(
-      'The priorities of the business, such as tax optimization, privacy, or ease of management.'
+      'A list of key strategic objectives for the incorporation, such as tax optimization, privacy, or ease of management.'
     ),
-  region: z.string().describe('The primary region of operation for the business. This could be "United States of America" or other international regions/global.'),
-  // bankingIntent: z.boolean().optional().describe('Whether the user requires banking assistance.'), // Removed
+  otherStrategicObjective: z
+    .string()
+    .optional()
+    .describe('Specific strategic objective if "Other" was selected.'),
+  region: z.string().describe('The primary region of operation for the business. This could be "USA (Exclusive Focus)" or other international regions.'),
 });
 export type RecommendIncorporationInput = z.infer<
   typeof RecommendIncorporationInputSchema
@@ -57,7 +64,6 @@ export async function recommendIncorporation(
   input: RecommendIncorporationInput
 ): Promise<RecommendIncorporationOutput> {
   const result = await recommendIncorporationFlow(input);
-  // Ensure the bestRecommendation has the isBestPick flag if we need it later, though not in schema for AI
   return {
       ...result,
       bestRecommendation: { ...result.bestRecommendation, isBestPick: true } as IncorporationRecommendationItem,
@@ -66,7 +72,7 @@ export async function recommendIncorporation(
 }
 
 const jurisdictionsString = JURISDICTIONS_LIST.join(', ');
-const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; '); // Use "FullName-Abbreviation" for prompt consistency. Original value includes FullName too.
+const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; '); 
 const usCompanyTypesString = US_COMPANY_TYPES_LIST.join(', ');
 const intlCompanyTypesString = INTERNATIONAL_COMPANY_TYPES_LIST.join(', ');
 
@@ -76,11 +82,23 @@ const prompt = ai.definePrompt({
   input: {schema: RecommendIncorporationInputSchema},
   output: {schema: RecommendIncorporationOutputSchema},
   prompt: `You are an expert international business incorporation advisor.
-Based on the user's business purpose, priorities, and primary region of operation, provide one 'bestRecommendation' and exactly three 'alternativeRecommendations' for incorporation.
+Based on the user's business activities, strategic objectives, and primary region of operation, provide one 'bestRecommendation' and exactly three 'alternativeRecommendations' for incorporation.
 
 User Inputs:
-  Business Purpose: {{{businessPurpose}}}
-  Priorities: {{{priorities}}}
+  Business Activities:
+  {{#each businessActivities}}
+  - {{{this}}}
+  {{/each}}
+  {{#if otherBusinessActivity}}
+  - Other Activity: {{{otherBusinessActivity}}}
+  {{/if}}
+  Strategic Objectives:
+  {{#each strategicObjectives}}
+  - {{{this}}}
+  {{/each}}
+  {{#if otherStrategicObjective}}
+  - Other Objective: {{{otherStrategicObjective}}}
+  {{/if}}
   Region of Operation: {{{region}}}
 
 Available Options:
@@ -98,13 +116,13 @@ Output Structure for EACH recommendation (bestRecommendation and each of the 3 a
   -   'price': An estimated base price (integer between 100 and 5000 USD) for this specific incorporation. Example: 1299.
 
 Specific Instructions:
-1.  **Primary Region "United States of America"**:
-    *   If the user's 'Region of Operation' is "United States of America", then the 'jurisdiction' for the 'bestRecommendation' MUST be "United States of America", and you MUST also recommend a 'state'. The alternatives can be international or other US states.
+1.  **Primary Region "USA (Exclusive Focus)"**:
+    *   If the user's 'Region of Operation' is "USA (Exclusive Focus)", then the 'jurisdiction' for the 'bestRecommendation' MUST be "United States of America", and you MUST also recommend a 'state'. The alternatives can be international or other US states.
 2.  **Other Primary Regions**:
-    *   If 'Region of Operation' is not "United States of America", you can recommend any suitable jurisdiction from the list, including "United States of America" (with a state) if it's a strong strategic fit.
+    *   If 'Region of Operation' is not "USA (Exclusive Focus)", you can recommend any suitable jurisdiction from the list, including "United States of America" (with a state) if it's a strong strategic fit. The 'bestRecommendation' can be any suitable jurisdiction.
 3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
 4.  **Pricing**: Provide a realistic base 'price' for each of the four recommendations.
-5.  **Reasoning Length**: Ensure the 'bestRecommendation' has more detailed reasoning than the alternatives.
+5.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings.
 
 Generate the 'bestRecommendation' and 'alternativeRecommendations' according to the schema.
   `,

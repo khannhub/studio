@@ -8,7 +8,7 @@ import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices';
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
-import type { OrderData, OrderItem, IncorporationRecommendationItem } from '@/lib/types';
+import type { OrderData, OrderItem, IncorporationRecommendationItem, NeedsAssessment } from '@/lib/types';
 import { STEPS, INITIAL_ADDONS } from '@/lib/types';
 
 // Define incorporationPackages here if it's used in total calculation or summary
@@ -23,20 +23,25 @@ const initialOrderData: OrderData = {
   userEmail: '',
   userPhone: '',
   needsAssessment: {
-    purpose: '',
-    priorities: '',
     region: '',
-    // bankingIntent: undefined, // Removed
+    businessActivities: [],
+    otherBusinessActivity: '',
+    strategicObjectives: [],
+    otherStrategicObjective: '',
     businessDescription: '',
-  },
+  } as NeedsAssessment,
   incorporation: {
     jurisdiction: '',
     state: '',
     companyType: '',
-    price: 0, // Base price for the selected jurisdiction/type
-    packageName: '', // Basic, Standard, Premium
+    price: 0, 
+    packageName: '',
     aiBestRecommendation: null,
     aiAlternativeRecommendations: [],
+    aiRecommendedJurisdiction: '',
+    aiRecommendedState: '',
+    aiRecommendedCompanyType: '',
+    aiRecommendedReasoning: '',
   },
   bankingAssistance: {
     selected: false,
@@ -79,6 +84,9 @@ export default function WizardPage() {
       if (newPartialData.bankingAssistance) {
         updatedData.bankingAssistance = { ...prev.bankingAssistance, ...newPartialData.bankingAssistance };
       }
+      if (newPartialData.needsAssessment) {
+        updatedData.needsAssessment = { ...prev.needsAssessment, ...newPartialData.needsAssessment };
+      }
       
       return updatedData;
     });
@@ -96,21 +104,18 @@ export default function WizardPage() {
       }
       name += ` ${incorporation.companyType}`;
 
-      let totalIncorporationPrice = incorporation.price || 0; // Base price for jurisdiction/type
+      let totalIncorporationPrice = incorporation.price || 0; 
       let description = `Formation in ${incorporation.jurisdiction}.`;
 
       if (incorporation.packageName) {
         const pkg = incorporationPackages.find(p => p.name === incorporation.packageName);
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationPrice += pkg.price; // Add package price to base price
+          totalIncorporationPrice += pkg.price; 
           description += ` Includes ${incorporation.packageName} features.`;
         }
       }
       
-      // Only add if base price is known (not 0 or TBD for custom)
-      // Or if a package is selected (which implies a base price was acceptable)
-      // This means if price is 0 (TBD custom), and package is selected, we still add it.
       if (totalIncorporationPrice > 0 || (incorporation.price === 0 && incorporation.packageName) ) {
          items.push({
             id: 'incorporation_service',
@@ -138,7 +143,6 @@ export default function WizardPage() {
     });
     
     setDerivedOrderItems(items);
-    // Update orderData.orderItems directly if you want it to persist across all state updates
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
@@ -214,7 +218,7 @@ export default function WizardPage() {
   const stepProps = {
     orderData,
     updateOrderData: updateOrderDataHandler,
-    orderItems: derivedOrderItems, // Pass derived items for display
+    orderItems: derivedOrderItems, 
     addOrderItem: addOrderItemHandler,
     updateOrderItem: updateOrderItemHandler,
     removeOrderItem: removeOrderItemHandler,
