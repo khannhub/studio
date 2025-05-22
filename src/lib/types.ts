@@ -78,7 +78,8 @@ export interface OrderData {
   bankingAssistance?: BankingAssistance;
   addOns?: AddOn[];
   
-  // Step 2 Details
+  // Step 2 (new) will primarily manipulate incorporation, bankingAssistance, addOns
+  // Step 3 Details (was Step 2)
   companyNames?: CompanyNameChoices;
   directors?: Person[];
   shareholders?: ShareholderInfo[];
@@ -86,7 +87,7 @@ export interface OrderData {
   deliveryAddress?: Address;
   extraRequests?: string;
 
-  // Step 3 Details
+  // Step 4 Details (was Step 3)
   billingAddress?: Address & { useDeliveryAddress?: boolean; usePrimaryContactAddress?: boolean; };
   paymentMethod?: "card" | "paypal" | "bank_transfer";
   paymentDetails?: { // Sensitive details would not be stored long-term like this
@@ -95,10 +96,11 @@ export interface OrderData {
     cvv?: string;
   };
   
-  // Step 4 Details
+  // Step 5 Details (was Step 4)
   orderId?: string;
   orderStatus?: "success" | "pending" | "failed";
   paymentDate?: string; 
+  orderItems?: OrderItem[]; // To store items for review and confirmation, might be redundant with derived items in page.tsx but useful for direct passing
 }
 
 export interface StepComponentProps {
@@ -117,10 +119,11 @@ export interface StepComponentProps {
 }
 
 export const STEPS = [
-  { id: 1, name: 'Define & Configure', path: 'define' },
-  { id: 2, name: 'Details', path: 'details' },
-  { id: 3, name: 'Review & Pay', path: 'review' },
-  { id: 4, name: 'Confirmation', path: 'confirmation' },
+  { id: 1, name: 'Define Needs', path: 'define' },
+  { id: 2, name: 'Select Services', path: 'services' },
+  { id: 3, name: 'Provide Details', path: 'details' },
+  { id: 4, name: 'Review & Pay', path: 'review' },
+  { id: 5, name: 'Confirmation', path: 'confirmation' },
 ];
 
 export const INITIAL_ADDONS: AddOn[] = [

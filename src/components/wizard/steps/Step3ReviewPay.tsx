@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { FC } from 'react';
@@ -10,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from '@/components/ui/separator';
 import { Edit3, CreditCard, Landmark, Lock, ChevronRight, ChevronLeft } from 'lucide-react'; // Assuming PayPal icon is not in lucide
-import Image from 'next/image'; // For PayPal logo if needed
+// import Image from 'next/image'; // For PayPal logo if needed - not used for now
 
 const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, orderItems, goToNextStep, goToPrevStep, goToStep, isLoading }) => {
 
@@ -30,22 +31,22 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
   const handleUseDeliveryAddress = (checked: boolean) => {
     updateOrderData(prev => ({
       billingAddress: {
-        ...(checked ? prev.deliveryAddress : {}),
+        ...(checked ? prev.deliveryAddress : {
+          street: '', city: '', stateOrProvince: '', postalCode: '', country: '' // Clear if unchecked
+        }),
         useDeliveryAddress: checked,
         usePrimaryContactAddress: checked ? false : prev.billingAddress?.usePrimaryContactAddress,
       }
     }));
   };
   
-  // TODO: Implement usePrimaryContactAddress logic similar to useDeliveryAddress
-  // This requires primaryContact to also have a full address structure.
-  // For now, this checkbox will be illustrative.
   const handleUsePrimaryContactAddress = (checked: boolean) => {
      updateOrderData(prev => ({
       billingAddress: {
-        // ... (logic to copy from primaryContact's address if available)
-        street: checked && prev.primaryContact?.email ? "123 Contact St (Mock)" : "", // Mocked
+        street: checked && prev.primaryContact?.email ? "123 Contact St (Mock)" : "", // Mocked logic
         city: checked ? "Contactville (Mock)" : "",
+        stateOrProvince: checked ? "Contact State (Mock)" : "",
+        postalCode: checked ? "00000 (Mock)" : "",
         country: checked ? "Contactland (Mock)" : "",
         usePrimaryContactAddress: checked,
         useDeliveryAddress: checked ? false : prev.billingAddress?.useDeliveryAddress,
@@ -59,7 +60,15 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
   };
   
   const handleEditSection = (step: number) => {
-    goToStep(step);
+    // Step mapping:
+    // Define Needs -> Step 1
+    // Select Services -> Step 2
+    // Provide Details -> Step 3
+    // This review step is Step 4.
+    // If editing order details, go to step 2 (Select Services) or step 3 (Provide Details)
+    // For now, let's make "Edit Order" go to Step 2 (Select Services)
+    // and they can navigate from there.
+    goToStep(step); 
   };
 
   return (
@@ -68,7 +77,8 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-2xl">Review Your Order</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => handleEditSection(1)}><Edit3 className="mr-2 h-4 w-4" /> Edit Order</Button>
+            {/* Edit Order button now takes to Step 2 (Select Services) */}
+            <Button variant="outline" size="sm" onClick={() => handleEditSection(2)}><Edit3 className="mr-2 h-4 w-4" /> Edit Services</Button>
           </div>
           <CardDescription>Please check your selections carefully before proceeding to payment.</CardDescription>
         </CardHeader>
@@ -88,6 +98,11 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
             <span>Final Total Amount Due:</span>
             <span>${totalAmount.toFixed(2)}</span>
           </div>
+           <div className="mt-4">
+             <Button variant="link" onClick={() => handleEditSection(3)} className="p-0 h-auto text-sm">
+               <Edit3 className="mr-1 h-3 w-3" /> Edit Company & Contact Details
+             </Button>
+           </div>
         </CardContent>
       </Card>
 
@@ -98,15 +113,15 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
-              <Checkbox id="useDelivery" checked={orderData.billingAddress?.useDeliveryAddress} onCheckedChange={handleUseDeliveryAddress} />
+              <Checkbox id="useDelivery" checked={orderData.billingAddress?.useDeliveryAddress || false} onCheckedChange={handleUseDeliveryAddress} />
               <Label htmlFor="useDelivery">Use Delivery Address</Label>
             </div>
             {/* <div className="flex items-center space-x-2">
-              <Checkbox id="useContact" checked={orderData.billingAddress?.usePrimaryContactAddress} onCheckedChange={handleUsePrimaryContactAddress} />
+              <Checkbox id="useContact" checked={orderData.billingAddress?.usePrimaryContactAddress || false} onCheckedChange={handleUsePrimaryContactAddress} />
               <Label htmlFor="useContact">Use Primary Contact Address (Mock)</Label>
             </div> */}
           </div>
-          {!orderData.billingAddress?.useDeliveryAddress && !orderData.billingAddress?.usePrimaryContactAddress && (
+          {!(orderData.billingAddress?.useDeliveryAddress) && !(orderData.billingAddress?.usePrimaryContactAddress) && (
             <>
               <div><Label htmlFor="billStreet">Street Address</Label><Input id="billStreet" value={orderData.billingAddress?.street || ''} onChange={e => handleBillingAddressChange('street', e.target.value)} /></div>
               <div><Label htmlFor="billCity">City</Label><Input id="billCity" value={orderData.billingAddress?.city || ''} onChange={e => handleBillingAddressChange('city', e.target.value)} /></div>
@@ -136,7 +151,6 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
             </Label>
             <Label htmlFor="payPayPal" className={`flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer hover:border-primary ${orderData.paymentMethod === 'paypal' ? 'border-primary ring-2 ring-primary bg-primary/10' : 'border-border'}`}>
               <RadioGroupItem value="paypal" id="payPayPal" className="sr-only" />
-              {/* Placeholder for PayPal icon/logo */}
               <svg className="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M7.064 16.85 7.064 16.85C16.13 5.964 14.937 5.11 13.63 5.11H7.064V1ZM7.064 16.85V20.01H11.02C13.061 20.01 14.571 18.666 14.571 16.85C14.571 15.035 13.061 13.69 11.02 13.69H7.064V16.85Z M14.8 8.394C14.8 7.277 14.046 6.6 12.982 6.6H8.987V12.201H12.982C14.046 12.201 14.8 11.524 14.8 10.407V8.394Z M18.964 8.782C18.818 7.79 17.484 6.91 15.95 6.91H15.47V7.852H15.95C17.014 7.852 17.622 8.291 17.768 8.978C17.902 9.615 17.56 10.143 16.976 10.44L18.348 12.77H17.052L15.902 10.89C15.902 10.89 15.47 13.09 15.47 13.09H14.508L15.058 7.018C15.058 7.018 15.104 6.986 15.104 6.986L15.104 5.11H19.23C20.326 5.11 21.112 5.76 20.934 6.986C20.768 8.224 19.688 8.718 18.964 8.782Z"/></svg>
               PayPal
             </Label>
@@ -174,9 +188,16 @@ const Step3ReviewPay: FC<StepComponentProps> = ({ orderData, updateOrderData, or
           <ChevronLeft className="mr-2 h-4 w-4" /> Previous
         </Button>
         <Button onClick={() => {
-          updateOrderData(prev => ({ ...prev, orderId: `IBC-${Date.now()}`, orderStatus: 'success' })); // Mock successful payment
+          // Simulate generating an order ID and successful payment
+          const newOrderId = `IBC-${Date.now()}`;
+          updateOrderData(prev => ({ 
+            ...prev, 
+            orderId: newOrderId, 
+            orderStatus: 'success',
+            paymentDate: new Date().toISOString(), // Record payment date
+          }));
           goToNextStep();
-        }} disabled={isLoading || !orderData.paymentMethod}>
+        }} disabled={isLoading || !orderData.paymentMethod || totalAmount === 0}>
           Pay ${totalAmount.toFixed(2)} <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

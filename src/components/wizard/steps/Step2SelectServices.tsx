@@ -1,0 +1,303 @@
+
+'use client';
+
+import type { FC } from 'react';
+import { useEffect } from 'react';
+import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance, OrderItem } from '@/lib/types';
+import { INITIAL_ADDONS } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Wand2, ChevronRight, ChevronLeft, Info, Building } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import TypingText from '@/components/common/TypingText';
+import { cn } from '@/lib/utils';
+
+const incorporationPackages = [
+  { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
+  { name: 'Standard', price: 699, features: ['All Basic Features', 'EIN Application Assistance', 'Corporate Kit'] },
+  { name: 'Premium', price: 999, features: ['All Standard Features', 'Priority Processing', 'Bank Account Opening Support'] },
+];
+
+const Step2SelectServices: FC<StepComponentProps> = ({
+  orderData,
+  updateOrderData,
+  addOrderItem,
+  updateOrderItem,
+  removeOrderItem,
+  goToNextStep,
+  goToPrevStep,
+  isLoading,
+}) => {
+  
+  const localAddons = orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
+
+  useEffect(() => {
+    // Ensure addons are initialized in orderData if not present
+    if (!orderData.addOns || orderData.addOns.length === 0) {
+      updateOrderData({ addOns: [...INITIAL_ADDONS] });
+    }
+    // If AI recommended banking assistance and it's not set, apply it
+    if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.reasoning && !orderData.bankingAssistance?.selected) {
+        if (orderData.bankingAssistance?.reasoning) { // check if reasoning is already set
+            handleBankingAssistSelect(true, orderData.bankingAssistance.reasoning);
+        }
+    }
+
+  }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.reasoning, orderData.bankingAssistance]);
+
+  const handleIncorporationFieldChange = (field: keyof IncorporationDetails, value: string) => {
+    updateOrderData(prev => ({
+      incorporation: {
+        ...prev.incorporation,
+        [field]: value,
+      }
+    }));
+     // If package is already selected, update the order item description
+    if (orderData.incorporation?.packageName) {
+      const selectedPkg = incorporationPackages.find(pkg => pkg.name === orderData.incorporation!.packageName);
+      if (selectedPkg) {
+        const newJurisdiction = field === 'jurisdiction' ? value : (orderData.incorporation?.jurisdiction || '');
+        const newCompanyType = field === 'companyType' ? value : (orderData.incorporation?.companyType || '');
+        updateOrderItem('incorporation_service', {
+            name: `${newJurisdiction || 'Selected Jurisdiction'} ${newCompanyType || 'Company Type'} - ${selectedPkg.name} Package`,
+            description: `Includes ${selectedPkg.name} features. Jurisdiction: ${newJurisdiction}, Type: ${newCompanyType}. ${orderData.incorporation?.reasoning ? 'AI Reasoning: '+orderData.incorporation.reasoning.substring(0,100)+'...' : ''}`.trim(),
+        });
+      }
+    }
+  };
+
+  const handleIncorporationPackageSelect = (packageName: string) => {
+    const selectedPkg = incorporationPackages.find(pkg => pkg.name === packageName);
+    if (selectedPkg) {
+      const newIncorporationData: IncorporationDetails = {
+        jurisdiction: orderData.incorporation?.jurisdiction || '', // Keep AI or user-inputted jurisdiction
+        companyType: orderData.incorporation?.companyType || '',   // Keep AI or user-inputted company type
+        reasoning: orderData.incorporation?.reasoning || '',     // Keep AI reasoning
+        packageName: selectedPkg.name,
+        price: selectedPkg.price,
+      };
+      updateOrderData({ incorporation: newIncorporationData });
+
+      const itemName = `${newIncorporationData.jurisdiction || 'Selected Jurisdiction'} ${newIncorporationData.companyType || 'Company Type'} - ${selectedPkg.name} Package`;
+      const itemDescription = `Includes ${selectedPkg.name} features. Jurisdiction: ${newIncorporationData.jurisdiction}, Type: ${newIncorporationData.companyType}. ${newIncorporationData.reasoning ? 'AI Reasoning: '+newIncorporationData.reasoning.substring(0,100)+'...' : ''}`.trim();
+      
+      const existingItem = orderData.orderItems?.find(item => item.id === 'incorporation_service');
+      if(existingItem){
+         updateOrderItem('incorporation_service', {
+          name: itemName,
+          price: selectedPkg.price,
+          quantity: 1,
+          description: itemDescription
+        });
+      } else {
+         addOrderItem({
+          id: 'incorporation_service',
+          name: itemName,
+          price: selectedPkg.price,
+          quantity: 1,
+          description: itemDescription
+        });
+      }
+    }
+  };
+
+  const handleBankingAssistSelect = (selected: boolean, aiReasoning?: string) => {
+    const defaultOption = "Standard Banking Assistance";
+    let optionToShow = orderData.bankingAssistance?.option || defaultOption;
+    
+    if (selected && aiReasoning && !orderData.bankingAssistance?.option) {
+        // If selecting and AI reasoning is available and no specific option already chosen by user
+        optionToShow = aiReasoning; // Use AI reasoning as the description/option
+    } else if (!selected) {
+        optionToShow = ''; // Clear option if not selected
+    }
+
+
+    const newBankingData: BankingAssistance = {
+      ...orderData.bankingAssistance,
+      selected: selected,
+      price: selected ? 250 : 0, // Assuming a fixed price for banking assistance
+      option: optionToShow,
+      reasoning: selected ? (orderData.bankingAssistance?.reasoning || aiReasoning) : undefined,
+    };
+    updateOrderData({ bankingAssistance: newBankingData });
+
+    if (selected) {
+      const existingItem = orderData.orderItems?.find(item => item.id === 'banking_assistance');
+      const itemPayload = { id: 'banking_assistance', name: 'Banking Assistance', price: newBankingData.price!, quantity: 1, description: newBankingData.option };
+      if(existingItem) {
+        updateOrderItem('banking_assistance', itemPayload);
+      } else {
+        addOrderItem(itemPayload);
+      }
+    } else {
+      removeOrderItem('banking_assistance');
+    }
+  };
+
+  const handleAddonToggle = (addonId: string) => {
+    const updatedAddons = localAddons.map(addon =>
+      addon.id === addonId ? { ...addon, selected: !addon.selected } : addon
+    );
+    updateOrderData({ addOns: updatedAddons });
+    const toggledAddon = updatedAddons.find(a => a.id === addonId);
+    if (toggledAddon) {
+      if (toggledAddon.selected) {
+        addOrderItem({ id: toggledAddon.id, name: toggledAddon.name, price: toggledAddon.price, quantity: 1 });
+      } else {
+        removeOrderItem(toggledAddon.id);
+      }
+    }
+  };
+
+  const isProceedButtonDisabled = isLoading || !orderData.incorporation?.packageName;
+
+  return (
+    <div className="space-y-8">
+      {orderData.incorporation?.reasoning && (
+        <Alert variant="default" className="bg-accent/50 border-accent">
+          <Wand2 className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-primary">AI Recommendation</AlertTitle>
+          <AlertDescription>
+            <p><strong>Jurisdiction:</strong> {orderData.incorporation.jurisdiction}</p>
+            <p><strong>Company Type:</strong> {orderData.incorporation.companyType}</p>
+            <p><strong>Reasoning:</strong> {orderData.incorporation.reasoning}</p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <TypingText text="Select Your Incorporation Package" speed={25} as="span" className="flex items-center" />
+          </CardTitle>
+          <CardDescription>Choose your jurisdiction, company type, and desired package.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <Label htmlFor="jurisdiction">Jurisdiction</Label>
+              <Input 
+                id="jurisdiction" 
+                placeholder="e.g., Delaware, BVI" 
+                value={orderData.incorporation?.jurisdiction || ''} 
+                onChange={e => handleIncorporationFieldChange('jurisdiction', e.target.value)} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="companyType">Company Type</Label>
+              <Input 
+                id="companyType" 
+                placeholder="e.g., LLC, Ltd" 
+                value={orderData.incorporation?.companyType || ''} 
+                onChange={e => handleIncorporationFieldChange('companyType', e.target.value)} 
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Incorporation Package</Label>
+            <RadioGroup
+              value={orderData.incorporation?.packageName || ""}
+              onValueChange={handleIncorporationPackageSelect}
+              className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              {incorporationPackages.map(pkg => (
+                <Label 
+                  key={pkg.name} 
+                  htmlFor={pkg.name} 
+                  className={cn(
+                    "flex flex-col items-start cursor-pointer rounded-lg border p-4 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl", 
+                    orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/10 shadow-md' : 'bg-card border-border hover:border-primary/70'
+                  )}
+                >
+                  <div className="flex items-center w-full">
+                    <RadioGroupItem value={pkg.name} id={pkg.name} className="mr-2"/>
+                    <span className="font-semibold">{pkg.name} - ${pkg.price}</span>
+                  </div>
+                  <ul className="mt-2 list-disc list-inside text-xs text-muted-foreground space-y-1">
+                    {pkg.features.map(f => <li key={f}>{f}</li>)}
+                  </ul>
+                </Label>
+              ))}
+            </RadioGroup>
+          </div>
+        </CardContent>
+      </Card>
+
+      {orderData.needsAssessment?.bankingIntent && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Building className="mr-2 h-5 w-5 text-primary" />
+              Banking Assistance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="bankingAssistSwitch" 
+                checked={orderData.bankingAssistance?.selected || false} 
+                onCheckedChange={(checked) => handleBankingAssistSelect(checked, orderData.bankingAssistance?.reasoning || orderData.incorporation?.reasoning)} 
+              />
+              <Label htmlFor="bankingAssistSwitch">Add Banking Assistance ($250)</Label>
+            </div>
+            {orderData.bankingAssistance?.selected && orderData.bankingAssistance.reasoning && (
+              <p className="text-xs text-muted-foreground mt-2 p-2 bg-accent/20 rounded-md">
+                Note: {orderData.bankingAssistance.reasoning}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <TypingText text="Popular Add-ons" speed={25} as="span" />
+          </CardTitle>
+          <CardDescription>Consider these popular services for your new company.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {localAddons.map(addon => ( // Display all addons
+              <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors">
+                <div className="flex items-center">
+                  <Switch id={addon.id} checked={addon.selected} onCheckedChange={() => handleAddonToggle(addon.id)} className="mr-3"/>
+                  <Label htmlFor={addon.id} className="cursor-pointer">
+                    {addon.name} <span className="text-muted-foreground">(${addon.price})</span>
+                  </Label>
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground"><Info className="h-4 w-4"/></Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>More information about {addon.name}.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between items-center mt-8 pt-6 border-t">
+        <Button variant="outline" onClick={goToPrevStep} disabled={isLoading}>
+           <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+        </Button>
+        <Button onClick={goToNextStep} disabled={isProceedButtonDisabled}>
+          Proceed to Provide Details <ChevronRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Step2SelectServices;

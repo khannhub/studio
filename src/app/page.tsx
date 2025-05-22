@@ -4,12 +4,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import WizardLayout from '@/components/wizard/WizardLayout';
 import Step1DefineConfigure from '@/components/wizard/steps/Step1DefineConfigure';
+import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices'; // New Import
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
-import type { OrderData, OrderItem, Person, ShareholderInfo } from '@/lib/types';
+import type { OrderData, OrderItem } from '@/lib/types'; // Person, ShareholderInfo removed as they are not directly used in initialOrderData here
 import { STEPS, INITIAL_ADDONS } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
+// Removed useToast import as it's not used directly in this file
 
 const initialOrderData: OrderData = {
   userEmail: '',
@@ -32,7 +33,7 @@ const initialOrderData: OrderData = {
     option: '',
     price: 0,
   },
-  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })), // Ensure it's a new array
+  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })),
   companyNames: { firstChoice: '', secondChoice: '', thirdChoice: '' },
   directors: [{ id: `dir-${Date.now()}`, fullName: '', email: '' }],
   shareholders: [{ id: `sh-${Date.now()}`, fullNameOrEntityName: '', shareAllocation: '' }],
@@ -43,24 +44,34 @@ const initialOrderData: OrderData = {
   paymentMethod: undefined,
   orderId: '',
   orderStatus: undefined,
+  orderItems: [], // Initialize orderItems
 };
 
 
 export default function WizardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [orderData, setOrderData] = useState<OrderData>(initialOrderData);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  // Order items are now part of orderData to be passed around, but also managed locally for UI updates.
+  // This local orderItems state will derive from orderData.orderItems for consistency.
+  const [derivedOrderItems, setDerivedOrderItems] = useState<OrderItem[]>([]); 
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Not used here
 
   const updateOrderDataHandler = useCallback((data: Partial<OrderData> | ((prevData: OrderData) => Partial<OrderData>)) => {
     setOrderData(prev => {
       const newPartialData = typeof data === 'function' ? data(prev) : data;
-      return { ...prev, ...newPartialData };
+      const updatedData = { ...prev, ...newPartialData };
+      
+      // If addOns are being updated, ensure they are fully part of the new object
+      if (newPartialData.addOns) {
+        updatedData.addOns = newPartialData.addOns;
+      }
+      
+      return updatedData;
     });
   }, []);
   
-  // Derive order items from orderData
+  // Derive order items from orderData whenever relevant parts of orderData change
   useEffect(() => {
     const items: OrderItem[] = [];
     if (orderData.incorporation?.packageName && orderData.incorporation.price && orderData.incorporation.price > 0) {
@@ -82,41 +93,64 @@ export default function WizardPage() {
       });
     }
     orderData.addOns?.forEach(addon => {
-      if (addon.selected) {
-        items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1 });
+      if (addon.selected && addon.price > 0) { // Ensure price is positive to avoid adding $0 items
+        items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.name} service.` });
       }
     });
-    setOrderItems(items);
+    
+    setDerivedOrderItems(items); // Update local derived state
+    // Also update orderData.orderItems to keep it in sync for passing to steps
+    // This direct mutation of orderData here might be better handled inside updateOrderDataHandler or a dedicated effect
+    // For now, to ensure consistency, let's update it.
+    setOrderData(prev => ({ ...prev, orderItems: items }));
+
   }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
 
+
   const addOrderItemHandler = useCallback((item: OrderItem) => {
-    setOrderItems(prevItems => {
-      const existingItem = prevItems.find(i => i.id === item.id);
-      if (existingItem) {
-        return prevItems.map(i => i.id === item.id ? { ...i, quantity: i.quantity + item.quantity, price: item.price, name: item.name, description: item.description } : i);
-      }
-      return [...prevItems, item];
+    setOrderData(prevData => {
+        const existingItems = prevData.orderItems || [];
+        const existingItemIndex = existingItems.findIndex(i => i.id === item.id);
+        let newItems;
+        if (existingItemIndex > -1) {
+            newItems = existingItems.map((i, idx) => 
+                idx === existingItemIndex ? { ...i, quantity: i.quantity + item.quantity, price: item.price, name: item.name, description: item.description } : i
+            );
+        } else {
+            newItems = [...existingItems, item];
+        }
+        return { ...prevData, orderItems: newItems };
     });
   }, []);
 
   const updateOrderItemHandler = useCallback((itemId: string, updates: Partial<OrderItem>) => {
-     setOrderItems(prevItems => 
-      prevItems.map(item => item.id === itemId ? {...item, ...updates} : item)
-     );
+     setOrderData(prevData => {
+        const newItems = (prevData.orderItems || []).map(item => 
+            item.id === itemId ? {...item, ...updates} : item
+        );
+        return { ...prevData, orderItems: newItems };
+     });
   }, []);
 
 
   const removeOrderItemHandler = useCallback((itemId: string) => {
-    setOrderItems(prevItems => prevItems.filter(item => item.id !== itemId));
-     // Also update the source in orderData if it's an addon or banking assistance
-    if (itemId === 'banking_assistance') {
-      updateOrderDataHandler(prev => ({ bankingAssistance: { ...prev.bankingAssistance, selected: false }}));
-    } else {
-      updateOrderDataHandler(prev => ({
-        addOns: prev.addOns?.map(addon => addon.id === itemId ? { ...addon, selected: false } : addon)
-      }));
-    }
-  }, [updateOrderDataHandler]);
+    setOrderData(prevData => {
+        const newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
+        // Also update the source in orderData if it's an addon or banking assistance
+        let updatedBankingAssistance = prevData.bankingAssistance;
+        if (itemId === 'banking_assistance') {
+          updatedBankingAssistance = { ...prevData.bankingAssistance, selected: false, price: 0 };
+        }
+        
+        let updatedAddOns = prevData.addOns;
+        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') { // Check if it's an addon
+             updatedAddOns = (prevData.addOns || []).map(addon => 
+                addon.id === itemId ? { ...addon, selected: false } : addon
+            );
+        }
+        return { ...prevData, orderItems: newItems, bankingAssistance: updatedBankingAssistance, addOns: updatedAddOns };
+    });
+  }, []);
 
 
   const goToNextStep = useCallback(() => {
@@ -144,7 +178,7 @@ export default function WizardPage() {
   const stepProps = {
     orderData,
     updateOrderData: updateOrderDataHandler,
-    orderItems,
+    orderItems: derivedOrderItems, // Pass derived items for UI
     addOrderItem: addOrderItemHandler,
     updateOrderItem: updateOrderItemHandler,
     removeOrderItem: removeOrderItemHandler,
@@ -159,9 +193,10 @@ export default function WizardPage() {
   const renderStepContent = () => {
     switch (currentStep) {
       case 1: return <Step1DefineConfigure {...stepProps} />;
-      case 2: return <Step2ProvideDetails {...stepProps} />;
-      case 3: return <Step3ReviewPay {...stepProps} />;
-      case 4: return <Step4Confirmation {...stepProps} />;
+      case 2: return <Step2SelectServices {...stepProps} />;
+      case 3: return <Step2ProvideDetails {...stepProps} />;
+      case 4: return <Step3ReviewPay {...stepProps} />;
+      case 5: return <Step4Confirmation {...stepProps} />;
       default: return <Step1DefineConfigure {...stepProps} />;
     }
   };
@@ -171,7 +206,7 @@ export default function WizardPage() {
       currentStep={currentStep}
       totalSteps={STEPS.length}
       stepNames={STEPS.map(s => s.name)}
-      orderItems={orderItems}
+      orderItems={derivedOrderItems} // Pass derived items to layout
     >
       {renderStepContent()}
     </WizardLayout>
