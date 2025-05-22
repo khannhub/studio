@@ -25,7 +25,6 @@ export interface IncorporationDetails {
 
   packageName?: string; // e.g., 'Basic', 'Standard', 'Premium'
   // packagePrice is derived from incorporationPackages in Step2SelectServices
-  // processingTime field is effectively covered by packageName
 
   // Store all AI recommendations
   aiBestRecommendation?: IncorporationRecommendationItem | null;
@@ -36,7 +35,7 @@ export interface BankingAssistance {
   selected?: boolean;
   option?: string;
   price?: number;
-  reasoning?: string;
+  reasoning?: string; // Reasoning for suggesting banking, can be from AI or generic
 }
 
 export interface AddOn {
@@ -86,7 +85,7 @@ export interface OrderData {
     purpose?: string;
     priorities?: string;
     region?: string;
-    bankingIntent?: boolean;
+    // bankingIntent?: boolean; // Removed
     businessDescription?: string;
   };
   incorporation?: IncorporationDetails;
@@ -187,15 +186,15 @@ export const US_COMPANY_TYPES_LIST = [
 ];
 
 export const INTERNATIONAL_COMPANY_TYPES_LIST = [
-  'Company Limited',
-  'Limited Liability Company', // Can exist internationally
-  'International Business Company',
-  'Private Limited Company',
-  'Public Limited Company',
-  'Limited by Shares',
-  'Global Business Company',
-  'Authorised Company',
-  'Limited Liability Partnership',
-  'Exempted Company',
-  'Corporation' // Generic, can exist outside US
+  'Company Limited', // General term, often UK/Commonwealth
+  'Limited Liability Company', // Can exist internationally, e.g., UAE LLC
+  'International Business Company', // Common in offshore jurisdictions like BVI, Seychelles
+  'Private Limited Company', // e.g., Singapore Pte. Ltd., UK Ltd.
+  'Public Limited Company', // e.g., UK PLC
+  'Limited by Shares', // A fundamental type, often part of other names
+  'Global Business Company', // Mauritius specific
+  'Authorised Company', // Mauritius specific
+  'Limited Liability Partnership', // e.g., UK LLP
+  'Exempted Company', // e.g., Cayman Islands
+  'Corporation' // Generic, can exist outside US, often for larger entities
 ];

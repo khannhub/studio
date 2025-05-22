@@ -26,7 +26,7 @@ const initialOrderData: OrderData = {
     purpose: '',
     priorities: '',
     region: '',
-    bankingIntent: undefined,
+    // bankingIntent: undefined, // Removed
     businessDescription: '',
   },
   incorporation: {
@@ -103,13 +103,14 @@ export default function WizardPage() {
         const pkg = incorporationPackages.find(p => p.name === incorporation.packageName);
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationPrice += pkg.price;
+          totalIncorporationPrice += pkg.price; // Add package price to base price
           description += ` Includes ${incorporation.packageName} features.`;
         }
       }
       
       // Only add if base price is known (not 0 or TBD for custom)
       // Or if a package is selected (which implies a base price was acceptable)
+      // This means if price is 0 (TBD custom), and package is selected, we still add it.
       if (totalIncorporationPrice > 0 || (incorporation.price === 0 && incorporation.packageName) ) {
          items.push({
             id: 'incorporation_service',
@@ -138,8 +139,6 @@ export default function WizardPage() {
     
     setDerivedOrderItems(items);
     // Update orderData.orderItems directly if you want it to persist across all state updates
-    // This might be redundant if derivedOrderItems is always calculated correctly
-    // For now, let's keep it to ensure data consistency if orderItems is ever directly used by steps
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
@@ -249,4 +248,3 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
-

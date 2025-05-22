@@ -12,11 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, CheckCircle } from 'lucide-react';
+import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, CheckCircle, Lightbulb } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Badge } from "@/components/ui/badge"; // Added import
+import { Badge } from "@/components/ui/badge"; 
 
 export const incorporationPackages = [
   { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
@@ -48,53 +48,59 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
     const currentJurisdiction = orderData.incorporation?.jurisdiction;
     const currentState = orderData.incorporation?.state;
+    const currentCompanyType = orderData.incorporation?.companyType;
+
 
     if (primaryRegionIsUSA) {
-        // Jurisdiction is fixed to USA if primary region is USA
         if (currentJurisdiction !== 'United States of America') {
           updateOrderData(prev => ({
               incorporation: {
                   ...prev.incorporation,
                   jurisdiction: 'United States of America',
-                  companyType: '', // Reset company type as jurisdiction logic changes
+                  companyType: prev.incorporation?.companyType || '', 
               }
           }));
         }
         setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
     } else {
-      // For non-USA primary region, set company types based on currently selected jurisdiction
       if (currentJurisdiction === 'United States of America') {
         setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
       } else {
         setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
       }
     }
-
-    // Initialize selectedIncorporationKey if current selection matches an AI recommendation
-    if (currentJurisdiction && orderData.incorporation?.companyType) {
-        const currentSelectionKey = `${currentJurisdiction}-${currentState || 'none'}-${orderData.incorporation.companyType}`;
+    
+    if (currentJurisdiction && currentCompanyType) {
+        const currentSelectionKey = `${currentJurisdiction}-${currentState || 'none'}-${currentCompanyType}`;
         const matchingAiRec = allAiRecommendations.find(rec =>
             `${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}` === currentSelectionKey
         );
         if (matchingAiRec) {
             setSelectedIncorporationKey(currentSelectionKey);
+             // Ensure price is correctly set if current selection matches an AI recommendation
+            if (orderData.incorporation?.price !== matchingAiRec.price) {
+                updateOrderData(prev => ({
+                    incorporation: { ...prev.incorporation, price: matchingAiRec.price }
+                }));
+            }
         } else {
-            setSelectedIncorporationKey(null); // Manual selection or no match
+            setSelectedIncorporationKey(null); 
         }
+    } else if (orderData.incorporation?.aiBestRecommendation) {
+        // If no selection yet, but AI best pick exists, use its key
+        const bestRec = orderData.incorporation.aiBestRecommendation;
+        setSelectedIncorporationKey(`${bestRec.jurisdiction}-${bestRec.state || 'none'}-${bestRec.companyType}`);
     }
 
-  }, [orderData.needsAssessment?.region, orderData.incorporation?.jurisdiction, orderData.incorporation?.companyType, orderData.incorporation?.state, updateOrderData, allAiRecommendations]);
+
+  }, [orderData.needsAssessment?.region, orderData.incorporation?.jurisdiction, orderData.incorporation?.companyType, orderData.incorporation?.state, orderData.incorporation?.price, updateOrderData, allAiRecommendations]);
 
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
-    if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.aiBestRecommendation && !orderData.bankingAssistance?.selected) {
-        if (orderData.bankingAssistance?.reasoning) { // This reasoning is from step 1
-            handleBankingAssistSelect(true, orderData.bankingAssistance.reasoning);
-        }
-    }
-  }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.aiBestRecommendation, orderData.bankingAssistance]);
+    // Removed auto-selection of banking assistance based on bankingIntent
+  }, [orderData.addOns, updateOrderData]);
 
 
   const handleSelectAiRecommendation = (rec: IncorporationRecommendationItem) => {
@@ -118,22 +124,29 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   const handleManualIncorporationChange = (field: keyof Pick<IncorporationDetails, 'jurisdiction' | 'state' | 'companyType'>, value: string) => {
     updateOrderData(prev => {
         let newIncorporation = { ...prev.incorporation } as IncorporationDetails;
+        let companyTypeChanged = false;
 
         if (field === 'jurisdiction') {
             newIncorporation.jurisdiction = value;
             if (value === 'United States of America') {
                 setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
                 // Do not auto-select state or company type, let user choose or AI default
+                if (!US_COMPANY_TYPES_LIST.includes(newIncorporation.companyType || '')) {
+                    newIncorporation.companyType = ''; companyTypeChanged = true;
+                }
             } else {
                 setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
                 newIncorporation.state = ''; // Clear state if not USA
+                if (!INTERNATIONAL_COMPANY_TYPES_LIST.includes(newIncorporation.companyType || '')) {
+                    newIncorporation.companyType = ''; companyTypeChanged = true;
+                }
             }
-            newIncorporation.companyType = ''; // Reset company type on jurisdiction change
+            // Reset company type only if current one is not valid for new jurisdiction type list
         } else if (field === 'state') {
             newIncorporation.state = value;
-            // Company type doesn't need to reset if only state changes within USA
         } else if (field === 'companyType') {
             newIncorporation.companyType = value;
+            companyTypeChanged = true;
         }
 
         const manualSelectionKey = `${newIncorporation.jurisdiction}-${newIncorporation.state || 'none'}-${newIncorporation.companyType}`;
@@ -145,11 +158,18 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             newIncorporation.price = matchingAiRec.price;
             setSelectedIncorporationKey(manualSelectionKey);
         } else {
-            if (newIncorporation.jurisdiction && newIncorporation.companyType && (newIncorporation.jurisdiction !== 'United States of America' || newIncorporation.state)) {
+            // Only set price to 0 if all required fields for a custom configuration are filled
+            const isUsaJurisdiction = newIncorporation.jurisdiction === 'United States of America';
+            const allFieldsFilledForCustom = newIncorporation.jurisdiction && newIncorporation.companyType && (!isUsaJurisdiction || (isUsaJurisdiction && newIncorporation.state));
+
+            if (allFieldsFilledForCustom) {
                  newIncorporation.price = 0; // Indicate Price on Request
-                 toast({ title: "Custom Configuration", description: "The price for this specific combination will be confirmed by our team.", duration: 5000 });
+                 if (companyTypeChanged || field === 'jurisdiction' || field === 'state') { // Show toast only if a key selection was made
+                    toast({ title: "Custom Configuration", description: "The price for this specific combination will be confirmed by our team.", duration: 5000 });
+                 }
             } else {
-                newIncorporation.price = prev.incorporation?.price;
+                 // If not all fields are filled, retain previous price or default to 0 if no previous price
+                 newIncorporation.price = prev.incorporation?.price || 0;
             }
             setSelectedIncorporationKey(null);
         }
@@ -168,25 +188,16 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     }));
   };
 
-  const handleBankingAssistSelect = (selected: boolean, suggestedReasoning?: string) => {
-    const defaultOption = "Standard Banking Assistance";
-    let optionToShow = orderData.bankingAssistance?.option || defaultOption;
-
-    if (selected && suggestedReasoning && !orderData.bankingAssistance?.option) {
-        optionToShow = suggestedReasoning;
-    } else if (!selected) {
-        optionToShow = '';
-    }
-
-    updateOrderData({
+  const handleBankingAssistSelect = (selected: boolean) => {
+    updateOrderData(prev => ({
         bankingAssistance: {
-            ...orderData.bankingAssistance,
+            ...prev.bankingAssistance,
             selected: selected,
-            price: selected ? 250 : 0,
-            option: optionToShow,
-            reasoning: selected ? (orderData.bankingAssistance?.reasoning || suggestedReasoning) : undefined,
+            price: selected ? 250 : 0, // Example price
+            option: selected ? (prev.bankingAssistance?.option || "Standard Banking Assistance") : '',
+            reasoning: selected ? prev.bankingAssistance?.reasoning : undefined,
         }
-    });
+    }));
   };
 
   const handleAddonToggle = (addonId: string) => {
@@ -200,7 +211,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     !orderData.incorporation?.jurisdiction ||
     !orderData.incorporation?.companyType ||
     (orderData.incorporation.jurisdiction === 'United States of America' && !orderData.incorporation.state) ||
-    orderData.incorporation.price === undefined ||
+    orderData.incorporation.price === undefined || // price can be 0 for custom, but must be defined
     !orderData.incorporation.packageName;
 
 
@@ -221,25 +232,29 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             className={cn(
                 "cursor-pointer transition-all duration-200 ease-in-out hover:shadow-xl overflow-hidden relative",
                 isSelected ? "ring-2 ring-primary shadow-lg border-primary" : "border-border hover:border-primary/70",
-                isBest ? "md:col-span-3" : "md:col-span-1"
+                isBest ? "md:col-span-3" : "md:col-span-1" // Adjusted span for layout
             )}
         >
-            <CardHeader className={cn("pb-2", isSelected ? "bg-primary/10" : "")}>
+            <CardHeader className={cn("pb-2", isSelected ? "bg-primary/5" : "")}>
                 <div className="flex justify-between items-start">
                     <CardTitle className={cn("text-lg", isBest ? "md:text-xl" : "text-base")}>
                         {rec.jurisdiction} {stateLabel && `(${stateLabel})`} - {rec.companyType}
                     </CardTitle>
-                    {isSelected && <CheckCircle className="h-6 w-6 text-primary flex-shrink-0"/>}
+                    {/* Removed CheckCircle icon: isSelected && <CheckCircle className="h-6 w-6 text-primary flex-shrink-0"/> */}
                 </div>
                 {rec.isBestPick && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Our Top Pick</Badge>}
-                 {!rec.isBestPick && isSelected && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Selected</Badge>}
-
+                {!rec.isBestPick && isSelected && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Selected</Badge>}
             </CardHeader>
-            <CardContent className="space-y-2 text-sm pb-12"> {/* Added pb-12 for price tag */}
-                <p className="text-muted-foreground">{rec.shortDescription}</p>
+            <CardContent className="space-y-2 text-sm pb-12"> {/* Ensure padding for price */}
+                {/* Removed shortDescription: <p className="text-muted-foreground">{rec.shortDescription}</p> */}
                 <p className="text-xs" dangerouslySetInnerHTML={{ __html: `<strong>Reasoning:</strong> ${rec.reasoning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}` }} />
-                <div className={cn("absolute bottom-3 right-3 text-lg font-bold px-3 py-1 rounded-md", isBest ? "text-xl" : "text-base", isSelected ? "bg-primary text-primary-foreground": "bg-muted text-primary" )}>
-                    Base: ${rec.price}
+                <div className={cn(
+                    "absolute bottom-3 right-3 text-lg font-bold", 
+                    isBest ? "text-xl" : "text-base", 
+                    "text-primary" // Always red text for price
+                    // Removed background and border styling for price
+                )}>
+                    ${rec.price}
                 </div>
             </CardContent>
         </Card>
@@ -253,22 +268,16 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         {(bestRec || altRecs.length > 0) && (
             <div className="space-y-4 py-2">
                 <div className="flex items-center space-x-2 mb-1">
-                    <Wand2 className="h-6 w-6 text-primary"/>
+                    <Lightbulb className="h-6 w-6 text-primary"/>
                     <h2 className="text-xl font-semibold">Our Recommendations</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Based on your needs, we suggest these options. Click to select one, or configure manually below.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> {/* Main grid for all recommendations */}
                     {bestRec && renderRecommendationCard(bestRec, true)}
+                    {altRecs.map(rec => renderRecommendationCard(rec, false))}
                 </div>
-                {altRecs.length > 0 && (
-                    <>
-                        <h3 className="text-md font-semibold pt-4">Alternative Options:</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {altRecs.map(rec => renderRecommendationCard(rec, false))}
-                        </div>
-                    </>
-                )}
+                {/* Removed "Alternative Options:" text */}
             </div>
         )}
 
@@ -295,7 +304,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 )}
 
                 {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
-                    <div className={cn(isPrimaryRegionUSA ? "md:col-span-2" : "")}>
+                     <div className={cn(isPrimaryRegionUSA ? "md:col-span-1" : "")}> {/* Full width if primary is USA, else half */}
                         <Label htmlFor="state">State</Label>
                         <Select
                             value={orderData.incorporation?.state || ''}
@@ -307,12 +316,12 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                     </div>
                 )}
 
-                <div className={cn(isPrimaryRegionUSA ? "md:col-span-2" : "")}>
+                <div className={cn(isPrimaryRegionUSA && !orderData.incorporation?.state ? "md:col-span-2" : "md:col-span-1")}>
                     <Label htmlFor="companyType">Company Type</Label>
                     <Select
                         value={orderData.incorporation?.companyType || ''}
                         onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
-                        disabled={!orderData.incorporation?.jurisdiction}
+                        disabled={!orderData.incorporation?.jurisdiction || (orderData.incorporation?.jurisdiction === 'United States of America' && !orderData.incorporation?.state)}
                     >
                         <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
                         <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
@@ -345,7 +354,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                     htmlFor={pkg.name}
                     className={cn(
                         "flex flex-col items-start cursor-pointer rounded-lg border p-4 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl",
-                        orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/10 shadow-md' : 'bg-card border-border hover:border-primary/70'
+                        orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/5 shadow-md' : 'bg-card border-border hover:border-primary/70'
                     )}
                     >
                     <div className="flex items-center w-full">
@@ -362,28 +371,26 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         </div>
 
         {/* Banking Assistance Section */}
-        {orderData.needsAssessment?.bankingIntent && (
-            <div className="space-y-3 py-2">
-                 <div className="flex items-center space-x-2 mb-1">
-                    <Banknote className="h-6 w-6 text-primary" />
-                    <h2 className="text-xl font-semibold">Banking Assistance</h2>
-                </div>
-                <div className="flex items-center space-x-2 p-3 rounded-md border hover:bg-accent/50 transition-colors">
-                    <Switch
-                        id="bankingAssistSwitch"
-                        checked={orderData.bankingAssistance?.selected || false}
-                        onCheckedChange={(checked) => handleBankingAssistSelect(checked, orderData.bankingAssistance?.reasoning)}
-                        className="mr-3"
-                    />
-                    <Label htmlFor="bankingAssistSwitch" className="flex-grow cursor-pointer">Add Banking Assistance <span className="text-muted-foreground">($250)</span></Label>
-                </div>
-                {orderData.bankingAssistance?.selected && orderData.bankingAssistance.reasoning && (
-                <p className="text-xs text-muted-foreground mt-1 p-2 bg-accent/20 rounded-md">
-                    Note: {orderData.bankingAssistance.reasoning}
-                </p>
-                )}
+        <div className="space-y-3 py-2">
+             <div className="flex items-center space-x-2 mb-1">
+                <Banknote className="h-6 w-6 text-primary" />
+                <h2 className="text-xl font-semibold">Banking Assistance</h2>
             </div>
-        )}
+            <div className="flex items-center space-x-2 p-3 rounded-md border hover:bg-accent/50 transition-colors">
+                <Switch
+                    id="bankingAssistSwitch"
+                    checked={orderData.bankingAssistance?.selected || false}
+                    onCheckedChange={(checked) => handleBankingAssistSelect(checked)}
+                    className="mr-3"
+                />
+                <Label htmlFor="bankingAssistSwitch" className="flex-grow cursor-pointer">Add Banking Assistance <span className="text-muted-foreground">($250)</span></Label>
+            </div>
+            {orderData.bankingAssistance?.selected && orderData.bankingAssistance.reasoning && (
+            <p className="text-xs text-muted-foreground mt-1 p-2 bg-accent/20 rounded-md">
+                Note: {orderData.bankingAssistance.reasoning}
+            </p>
+            )}
+        </div>
 
         {/* Add-ons Section */}
         <div className="space-y-3 py-2">
@@ -428,4 +435,3 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 };
 
 export default Step2SelectServices;
-
