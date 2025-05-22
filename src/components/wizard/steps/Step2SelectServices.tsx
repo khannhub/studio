@@ -12,11 +12,13 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, CheckCircle, Lightbulb } from 'lucide-react';
+import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, Lightbulb, Settings } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Badge } from "@/components/ui/badge"; 
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
 
 export const incorporationPackages = [
   { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
@@ -35,6 +37,8 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   const [isPrimaryRegionUSA, setIsPrimaryRegionUSA] = useState(false);
   const [currentCompanyTypes, setCurrentCompanyTypes] = useState<string[]>(INTERNATIONAL_COMPANY_TYPES_LIST);
   const [selectedIncorporationKey, setSelectedIncorporationKey] = useState<string | null>(null);
+  const [manualConfigAccordionValue, setManualConfigAccordionValue] = useState<string | undefined>(undefined);
+
 
   const allAiRecommendations = useMemo(() => [
     ...(orderData.incorporation?.aiBestRecommendation ? [orderData.incorporation.aiBestRecommendation] : []),
@@ -50,67 +54,83 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     const currentState = orderData.incorporation?.state;
     const currentCompanyType = orderData.incorporation?.companyType;
 
-
-    if (primaryRegionIsUSA) {
-        if (currentJurisdiction !== 'United States of America') {
-          updateOrderData(prev => ({
-              incorporation: {
-                  ...prev.incorporation,
-                  jurisdiction: 'United States of America',
-                  companyType: prev.incorporation?.companyType || '', 
-              }
-          }));
-        }
+    // Determine current company types list based on selected jurisdiction
+    if (currentJurisdiction === 'United States of America') {
         setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
     } else {
-      if (currentJurisdiction === 'United States of America') {
-        setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-      } else {
         setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
-      }
     }
     
+    // Initialize selectedIncorporationKey based on current orderData or AI best pick
     if (currentJurisdiction && currentCompanyType) {
         const currentSelectionKey = `${currentJurisdiction}-${currentState || 'none'}-${currentCompanyType}`;
+        setSelectedIncorporationKey(currentSelectionKey);
+
+        // Ensure price is correctly set if current selection matches an AI recommendation
         const matchingAiRec = allAiRecommendations.find(rec =>
             `${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}` === currentSelectionKey
         );
-        if (matchingAiRec) {
-            setSelectedIncorporationKey(currentSelectionKey);
-             // Ensure price is correctly set if current selection matches an AI recommendation
-            if (orderData.incorporation?.price !== matchingAiRec.price) {
-                updateOrderData(prev => ({
-                    incorporation: { ...prev.incorporation, price: matchingAiRec.price }
-                }));
-            }
-        } else {
-            setSelectedIncorporationKey(null); 
+        if (matchingAiRec && orderData.incorporation?.price !== matchingAiRec.price) {
+             updateOrderData(prev => ({
+                incorporation: { ...prev.incorporation, price: matchingAiRec.price }
+            }));
+        } else if (!matchingAiRec && orderData.incorporation?.price === undefined) {
+            // If it's a custom config and price is not set, it should be 0 (TBD)
+            updateOrderData(prev => ({
+                incorporation: { ...prev.incorporation, price: 0 }
+            }));
         }
     } else if (orderData.incorporation?.aiBestRecommendation) {
-        // If no selection yet, but AI best pick exists, use its key
         const bestRec = orderData.incorporation.aiBestRecommendation;
+        // Automatically select the best recommendation if no specific selection has been made yet
+        updateOrderData(prev => ({
+            incorporation: {
+                ...prev.incorporation,
+                jurisdiction: bestRec.jurisdiction,
+                state: bestRec.state,
+                companyType: bestRec.companyType,
+                price: bestRec.price,
+            }
+        }));
         setSelectedIncorporationKey(`${bestRec.jurisdiction}-${bestRec.state || 'none'}-${bestRec.companyType}`);
+        if (bestRec.jurisdiction === 'United States of America') {
+            setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
+        } else {
+            setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+        }
     }
+  }, [
+    orderData.needsAssessment?.region,
+    orderData.incorporation?.jurisdiction,
+    orderData.incorporation?.companyType,
+    orderData.incorporation?.state,
+    orderData.incorporation?.aiBestRecommendation, // Ensure effect runs if AI recs change
+    // orderData.incorporation?.price, // Price check is internal, no need to trigger re-render for it
+    updateOrderData,
+    allAiRecommendations // Recalculate if allAiRecommendations changes
+  ]);
 
-
-  }, [orderData.needsAssessment?.region, orderData.incorporation?.jurisdiction, orderData.incorporation?.companyType, orderData.incorporation?.state, orderData.incorporation?.price, updateOrderData, allAiRecommendations]);
 
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
-    // Removed auto-selection of banking assistance based on bankingIntent
   }, [orderData.addOns, updateOrderData]);
 
 
   const handleSelectAiRecommendation = (rec: IncorporationRecommendationItem) => {
     updateOrderData(prev => ({
         incorporation: {
-            ...prev.incorporation,
+            ...prev.incorporation, // Preserve existing package name and AI recommendations
+            packageName: prev.incorporation?.packageName,
+            aiBestRecommendation: prev.incorporation?.aiBestRecommendation,
+            aiAlternativeRecommendations: prev.incorporation?.aiAlternativeRecommendations,
+
+            // Set current user selections to the clicked AI pick
             jurisdiction: rec.jurisdiction,
             state: rec.state,
             companyType: rec.companyType,
-            price: rec.price, // This is the base price
+            price: rec.price, // Base price from AI's pick
         }
     }));
     setSelectedIncorporationKey(`${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}`);
@@ -119,18 +139,20 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     } else {
         setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
     }
+    setManualConfigAccordionValue(undefined); // Collapse manual config section
   };
 
   const handleManualIncorporationChange = (field: keyof Pick<IncorporationDetails, 'jurisdiction' | 'state' | 'companyType'>, value: string) => {
     updateOrderData(prev => {
         let newIncorporation = { ...prev.incorporation } as IncorporationDetails;
         let companyTypeChanged = false;
+        let jurisdictionChanged = false;
 
         if (field === 'jurisdiction') {
             newIncorporation.jurisdiction = value;
+            jurisdictionChanged = true;
             if (value === 'United States of America') {
                 setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-                // Do not auto-select state or company type, let user choose or AI default
                 if (!US_COMPANY_TYPES_LIST.includes(newIncorporation.companyType || '')) {
                     newIncorporation.companyType = ''; companyTypeChanged = true;
                 }
@@ -141,7 +163,6 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                     newIncorporation.companyType = ''; companyTypeChanged = true;
                 }
             }
-            // Reset company type only if current one is not valid for new jurisdiction type list
         } else if (field === 'state') {
             newIncorporation.state = value;
         } else if (field === 'companyType') {
@@ -158,22 +179,19 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             newIncorporation.price = matchingAiRec.price;
             setSelectedIncorporationKey(manualSelectionKey);
         } else {
-            // Only set price to 0 if all required fields for a custom configuration are filled
             const isUsaJurisdiction = newIncorporation.jurisdiction === 'United States of America';
             const allFieldsFilledForCustom = newIncorporation.jurisdiction && newIncorporation.companyType && (!isUsaJurisdiction || (isUsaJurisdiction && newIncorporation.state));
 
             if (allFieldsFilledForCustom) {
                  newIncorporation.price = 0; // Indicate Price on Request
-                 if (companyTypeChanged || field === 'jurisdiction' || field === 'state') { // Show toast only if a key selection was made
+                 if (companyTypeChanged || jurisdictionChanged || field === 'state') {
                     toast({ title: "Custom Configuration", description: "The price for this specific combination will be confirmed by our team.", duration: 5000 });
                  }
             } else {
-                 // If not all fields are filled, retain previous price or default to 0 if no previous price
                  newIncorporation.price = prev.incorporation?.price || 0;
             }
             setSelectedIncorporationKey(null);
         }
-
         return { incorporation: newIncorporation };
     });
   };
@@ -193,7 +211,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         bankingAssistance: {
             ...prev.bankingAssistance,
             selected: selected,
-            price: selected ? 250 : 0, // Example price
+            price: selected ? 250 : 0, 
             option: selected ? (prev.bankingAssistance?.option || "Standard Banking Assistance") : '',
             reasoning: selected ? prev.bankingAssistance?.reasoning : undefined,
         }
@@ -211,7 +229,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     !orderData.incorporation?.jurisdiction ||
     !orderData.incorporation?.companyType ||
     (orderData.incorporation.jurisdiction === 'United States of America' && !orderData.incorporation.state) ||
-    orderData.incorporation.price === undefined || // price can be 0 for custom, but must be defined
+    orderData.incorporation.price === undefined ||
     !orderData.incorporation.packageName;
 
 
@@ -232,27 +250,24 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             className={cn(
                 "cursor-pointer transition-all duration-200 ease-in-out hover:shadow-xl overflow-hidden relative",
                 isSelected ? "ring-2 ring-primary shadow-lg border-primary" : "border-border hover:border-primary/70",
-                isBest ? "md:col-span-3" : "md:col-span-1" // Adjusted span for layout
+                isBest ? "md:col-span-3" : "md:col-span-1" 
             )}
         >
-            <CardHeader className={cn("pb-2", isSelected ? "bg-primary/5" : "")}>
+            <CardHeader className={cn("pb-2")}>
                 <div className="flex justify-between items-start">
                     <CardTitle className={cn("text-lg", isBest ? "md:text-xl" : "text-base")}>
                         {rec.jurisdiction} {stateLabel && `(${stateLabel})`} - {rec.companyType}
                     </CardTitle>
-                    {/* Removed CheckCircle icon: isSelected && <CheckCircle className="h-6 w-6 text-primary flex-shrink-0"/> */}
                 </div>
                 {rec.isBestPick && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Our Top Pick</Badge>}
                 {!rec.isBestPick && isSelected && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Selected</Badge>}
+
             </CardHeader>
-            <CardContent className="space-y-2 text-sm pb-12"> {/* Ensure padding for price */}
-                {/* Removed shortDescription: <p className="text-muted-foreground">{rec.shortDescription}</p> */}
+            <CardContent className="space-y-2 text-sm pb-12">
                 <p className="text-xs" dangerouslySetInnerHTML={{ __html: `<strong>Reasoning:</strong> ${rec.reasoning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}` }} />
                 <div className={cn(
-                    "absolute bottom-3 right-3 text-lg font-bold", 
-                    isBest ? "text-xl" : "text-base", 
-                    "text-primary" // Always red text for price
-                    // Removed background and border styling for price
+                    "absolute bottom-3 right-3 text-lg font-bold text-primary", 
+                    isBest ? "text-xl" : "text-base"
                 )}>
                     ${rec.price}
                 </div>
@@ -264,113 +279,117 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-        {/* Recommendations Section */}
         {(bestRec || altRecs.length > 0) && (
             <div className="space-y-4 py-2">
                 <div className="flex items-center space-x-2 mb-1">
                     <Lightbulb className="h-6 w-6 text-primary"/>
                     <h2 className="text-xl font-semibold">Our Recommendations</h2>
                 </div>
-                <p className="text-sm text-muted-foreground">Based on your needs, we suggest these options. Click to select one, or configure manually below.</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> {/* Main grid for all recommendations */}
+                <p className="text-sm text-muted-foreground">Based on your needs, we suggest these options. Click to select one, or customize below.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {bestRec && renderRecommendationCard(bestRec, true)}
                     {altRecs.map(rec => renderRecommendationCard(rec, false))}
                 </div>
-                {/* Removed "Alternative Options:" text */}
             </div>
         )}
 
-        {/* Manual Configuration Section */}
-        <div className="space-y-6 py-2">
-            <div className="flex items-center space-x-2 mb-1">
-                <Building className="h-6 w-6 text-primary"/>
-                <h2 className="text-xl font-semibold">Configure Your Incorporation</h2>
-            </div>
-            <p className="text-sm text-muted-foreground">Select your preferred jurisdiction, company type, and package.</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
-                {!isPrimaryRegionUSA && (
-                    <div>
-                        <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                        <Select
-                            value={orderData.incorporation?.jurisdiction || ''}
-                            onValueChange={(value) => handleManualIncorporationChange('jurisdiction', value)}
-                        >
-                            <SelectTrigger id="jurisdiction" className="w-full mt-1"><SelectValue placeholder="Select Jurisdiction" /></SelectTrigger>
-                            <SelectContent>{JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent>
-                        </Select>
+        <Accordion type="single" collapsible className="w-full" value={manualConfigAccordionValue} onValueChange={setManualConfigAccordionValue}>
+            <AccordionItem value="manual-config">
+                <AccordionTrigger>
+                    <div className="flex items-center space-x-2 py-2 w-full">
+                        <Settings className="h-6 w-6 text-primary"/>
+                        <h2 className="text-xl font-semibold">Customize Your Incorporation</h2>
                     </div>
-                )}
+                </AccordionTrigger>
+                <AccordionContent className="pt-2 pb-4 space-y-4">
+                    <p className="text-sm text-muted-foreground">Select your preferred jurisdiction, company type, and package.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+                        {!isPrimaryRegionUSA && (
+                            <div>
+                                <Label htmlFor="jurisdiction">Jurisdiction</Label>
+                                <Select
+                                    value={orderData.incorporation?.jurisdiction || ''}
+                                    onValueChange={(value) => handleManualIncorporationChange('jurisdiction', value)}
+                                >
+                                    <SelectTrigger id="jurisdiction" className="w-full mt-1"><SelectValue placeholder="Select Jurisdiction" /></SelectTrigger>
+                                    <SelectContent>{JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
-                {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
-                     <div className={cn(isPrimaryRegionUSA ? "md:col-span-1" : "")}> {/* Full width if primary is USA, else half */}
-                        <Label htmlFor="state">State</Label>
-                        <Select
-                            value={orderData.incorporation?.state || ''}
-                            onValueChange={(value) => handleManualIncorporationChange('state', value)}
-                        >
-                            <SelectTrigger id="state" className="w-full mt-1"><SelectValue placeholder="Select State" /></SelectTrigger>
-                            <SelectContent>{US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                        </Select>
+                        {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
+                            <div className={cn(isPrimaryRegionUSA ? "md:col-span-2" : "md:col-span-1")}> {/* Full width for state if primary is USA */}
+                                <Label htmlFor="state">State</Label>
+                                <Select
+                                    value={orderData.incorporation?.state || ''}
+                                    onValueChange={(value) => handleManualIncorporationChange('state', value)}
+                                >
+                                    <SelectTrigger id="state" className="w-full mt-1"><SelectValue placeholder="Select State" /></SelectTrigger>
+                                    <SelectContent>{US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        <div className={cn(isPrimaryRegionUSA && orderData.incorporation?.state ? "md:col-span-2" : "md:col-span-1")}>
+                            <Label htmlFor="companyType">Company Type</Label>
+                            <Select
+                                value={orderData.incorporation?.companyType || ''}
+                                onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
+                                disabled={!orderData.incorporation?.jurisdiction || (orderData.incorporation?.jurisdiction === 'United States of America' && !orderData.incorporation?.state)}
+                            >
+                                <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
+                                <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                )}
-
-                <div className={cn(isPrimaryRegionUSA && !orderData.incorporation?.state ? "md:col-span-2" : "md:col-span-1")}>
-                    <Label htmlFor="companyType">Company Type</Label>
-                    <Select
-                        value={orderData.incorporation?.companyType || ''}
-                        onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
-                        disabled={!orderData.incorporation?.jurisdiction || (orderData.incorporation?.jurisdiction === 'United States of America' && !orderData.incorporation?.state)}
-                    >
-                        <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
-                        <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-            </div>
-            {orderData.incorporation?.price === 0 && orderData.incorporation?.jurisdiction && orderData.incorporation?.companyType && (isPrimaryRegionUSA ? orderData.incorporation?.state : true) && (
-                <Alert variant="default" className="bg-amber-100 border-amber-300 text-amber-800">
-                    <Info className="h-4 w-4 text-amber-700" />
-                    <AlertTitle>Price Confirmation Needed</AlertTitle>
-                    <AlertDescription>
-                        The base price for your custom selection ({orderData.incorporation?.jurisdiction}
-                        {orderData.incorporation?.state ? ` (${orderData.incorporation.state.split('-')[0]})` : ''}
-                        {' '}{orderData.incorporation?.companyType}) will be confirmed by our team.
-                        The package price will be added to this confirmed base price.
-                    </AlertDescription>
-                </Alert>
-            )}
-
-            <div>
-                <Label>{packageSectionLabel}</Label>
-                <RadioGroup
-                    value={orderData.incorporation?.packageName || ""}
-                    onValueChange={handleIncorporationPackageSelect}
-                    className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
-                {incorporationPackages.map(pkg => (
-                    <Label
-                    key={pkg.name}
-                    htmlFor={pkg.name}
-                    className={cn(
-                        "flex flex-col items-start cursor-pointer rounded-lg border p-4 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl",
-                        orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/5 shadow-md' : 'bg-card border-border hover:border-primary/70'
+                    {orderData.incorporation?.price === 0 && orderData.incorporation?.jurisdiction && orderData.incorporation?.companyType && (isPrimaryRegionUSA ? orderData.incorporation?.state : true) && (
+                        <Alert variant="default" className="bg-amber-100 border-amber-300 text-amber-800">
+                            <Info className="h-4 w-4 text-amber-700" />
+                            <AlertTitle>Price Confirmation Needed</AlertTitle>
+                            <AlertDescription>
+                                The base price for your custom selection ({orderData.incorporation?.jurisdiction}
+                                {orderData.incorporation?.state ? ` (${orderData.incorporation.state.split('-')[0]})` : ''}
+                                {' '}{orderData.incorporation?.companyType}) will be confirmed by our team.
+                                The package price will be added to this confirmed base price.
+                            </AlertDescription>
+                        </Alert>
                     )}
-                    >
-                    <div className="flex items-center w-full">
-                        <RadioGroupItem value={pkg.name} id={pkg.name} className="mr-2"/>
-                        <span className="font-semibold">{pkg.name} - ${pkg.price}</span>
-                    </div>
-                    <ul className="mt-2 list-disc list-inside text-xs text-muted-foreground space-y-1">
-                        {pkg.features.map(f => <li key={f}>{f}</li>)}
-                    </ul>
-                    </Label>
-                ))}
-                </RadioGroup>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+
+
+        <div className="space-y-3 py-2">
+            <div className="flex items-center space-x-2 mb-1">
+                <Package className="h-6 w-6 text-primary" />
+                 <h2 className="text-xl font-semibold">{packageSectionLabel}</h2>
             </div>
+             <RadioGroup
+                value={orderData.incorporation?.packageName || ""}
+                onValueChange={handleIncorporationPackageSelect}
+                className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+            {incorporationPackages.map(pkg => (
+                <Label
+                key={pkg.name}
+                htmlFor={pkg.name}
+                className={cn(
+                    "flex flex-col items-start cursor-pointer rounded-lg border p-4 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl",
+                    orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/5 shadow-md' : 'bg-card border-border hover:border-primary/70'
+                )}
+                >
+                <div className="flex items-center w-full">
+                    <RadioGroupItem value={pkg.name} id={pkg.name} className="mr-2"/>
+                    <span className="font-semibold">{pkg.name} - ${pkg.price}</span>
+                </div>
+                <ul className="mt-2 list-disc list-inside text-xs text-muted-foreground space-y-1">
+                    {pkg.features.map(f => <li key={f}>{f}</li>)}
+                </ul>
+                </Label>
+            ))}
+            </RadioGroup>
         </div>
 
-        {/* Banking Assistance Section */}
         <div className="space-y-3 py-2">
              <div className="flex items-center space-x-2 mb-1">
                 <Banknote className="h-6 w-6 text-primary" />
@@ -392,7 +411,6 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             )}
         </div>
 
-        {/* Add-ons Section */}
         <div className="space-y-3 py-2">
             <div className="flex items-center space-x-2 mb-1">
                 <ShoppingBag className="h-6 w-6 text-primary" />
@@ -421,7 +439,6 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             </div>
         </div>
 
-        {/* Navigation */}
         <div className="flex justify-between items-center mt-8 pt-6 border-t">
             <Button variant="outline" onClick={goToPrevStep} disabled={isLoading}>
             <ChevronLeft className="mr-2 h-4 w-4" /> Previous
@@ -435,3 +452,4 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 };
 
 export default Step2SelectServices;
+
