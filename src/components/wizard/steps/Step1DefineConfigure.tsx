@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-// import { Switch } from "@/components/ui/switch"; // Removed
 import { Loader2, Wand2, ChevronRight, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout, MapPin, Flag, PiggyBank, Zap, FileText, Lightbulb } from 'lucide-react';
 import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
@@ -85,9 +84,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       region: orderData.needsAssessment.region,
     };
     
-    // Check if inputs have changed OR if there's no existing best recommendation
     const inputsHaveChangedOrNoRecExists = !lastSuccessfulAiCallInputs ||
-      !orderData.incorporation?.aiBestRecommendation || // Added check for existing best recommendation
+      !orderData.incorporation?.aiBestRecommendation || 
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
@@ -113,26 +111,20 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         if (currentAiInputs.region === 'United States of America') {
             finalJurisdiction = 'United States of America';
             // Ensure state is set if AI somehow missed it for US primary region.
-            finalState = bestRec.state || (US_STATES_LIST.find(s => s.label === "Delaware")?.value); // Default to Delaware if AI missed
+            finalState = bestRec.state || (US_STATES_LIST.find(s => s.label === "Delaware")?.value); 
         }
         
         updateOrderData(prev => {
           const newIncorporationDetails: IncorporationDetails = {
-            // Preserve existing package name if any, otherwise clear it for new recommendations
             packageName: prev.incorporation?.packageName, 
-
-            // Set current user selections to the AI's best pick initially
             jurisdiction: finalJurisdiction,
             state: finalState,
             companyType: bestRec.companyType,
-            price: bestRec.price, // Base price from AI's best pick
-
-            // Store all AI recommendations
+            price: bestRec.price, 
             aiBestRecommendation: { ...bestRec, isBestPick: true },
             aiAlternativeRecommendations: recommendations.alternativeRecommendations.map(alt => ({...alt, isBestPick: false})),
           };
           
-          // Update banking assistance reasoning if banking was selected previously
           let updatedBankingAssistance = prev.bankingAssistance;
           if (prev.bankingAssistance?.selected) {
             const recStateDisplay = finalState ? ` (${finalState.split('-')[0]})` : '';
@@ -181,8 +173,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           htmlFor={`${groupName}-${option.id}`}
           className={cn(
             "flex flex-col items-center justify-center text-center p-3 sm:p-4 border rounded-lg cursor-pointer transition-all duration-200 ease-in-out",
-            "hover:-translate-y-1 hover:shadow-lg", // Keep hover shadow for better feedback
-            selectedValue === option.value ? 'border-primary ring-2 ring-primary shadow-md' : 'border-border bg-card hover:border-primary/70' // Removed bg-primary/10
+            "hover:-translate-y-1 hover:shadow-lg", 
+            selectedValue === option.value ? 'border-primary ring-2 ring-primary shadow-md' : 'border-border hover:border-primary/70'
           )}
         >
           <RadioGroupItem value={option.value} id={`${groupName}-${option.id}`} className="sr-only" />
@@ -205,7 +197,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       !orderData.needsAssessment?.purpose ||
       !orderData.needsAssessment?.priorities ||
       !orderData.needsAssessment?.region;
-      // Removed bankingIntent check: !orderData.needsAssessment?.bankingIntent === undefined;
 
 
   return (
@@ -280,23 +271,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
               className="mt-1 min-h-[100px]"
             />
           </div>
-           {/* Removed Banking Assistance Switch Section
-           <div>
-            <Label className="text-base font-medium mb-2">
-                 Do you require banking assistance?
-            </Label>
-            <div className="flex items-center space-x-3">
-              <Switch
-                id="bankingIntentSwitch"
-                checked={orderData.needsAssessment?.bankingIntent === true}
-                onCheckedChange={(checked) => handleNeedsAssessmentChange('bankingIntent', checked)}
-              />
-              <Label htmlFor="bankingIntentSwitch" className="font-normal">
-                {orderData.needsAssessment?.bankingIntent ? "Yes, please provide banking assistance options." : "No, I do not require banking assistance at this time."}
-              </Label>
-            </div>
-          </div> 
-          */}
         </div>
       </div>
 
@@ -304,7 +278,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         <Button onClick={handleGetRecommendationAndProceed} disabled={isProceedButtonDisabled} className="w-full md:w-auto">
           {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {!isAiLoading && !isPending && <Wand2 className="mr-2 h-4 w-4" />}
-          Get Recommendations &amp; Proceed
+          Get Recommendations
           {!isAiLoading && !isPending && <ChevronRight className="ml-2 h-4 w-4" />}
         </Button>
       </div>
