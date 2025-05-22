@@ -2,7 +2,7 @@
 
 import type { FC } from 'react';
 import { useState } from 'react';
-import type { StepComponentProps, OrderData, Person, ShareholderInfo, Address, ShareholderType } from '@/lib/types';
+import { ShareholderType, type StepComponentProps, type OrderData, type Person, type ShareholderInfo, type Address } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,7 +52,7 @@ const Step2ProvideDetails: FC<StepComponentProps> = ({ orderData, updateOrderDat
 
   const addShareholder = () => {
     updateOrderData(prev => ({
-      shareholders: [...(prev.shareholders || []), { id: `sh-${Date.now()}`, type: 'individual' as ShareholderType.INDIVIDUAL }]
+      shareholders: [...(prev.shareholders || []), { id: `sh-${Date.now()}`, type: ShareholderType.INDIVIDUAL }]
     }));
   };
   const removeShareholder = (index: number) => {
