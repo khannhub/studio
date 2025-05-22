@@ -383,19 +383,34 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
 
   let isNextButtonDisabled = isLoading || isPending;
+
   if (!isNextButtonDisabled) { // Only check further conditions if not already disabled by loading state
-    if (currentQuestion === 0) {
-      if (!isEmailValid) isNextButtonDisabled = true;
-    } else if (currentQuestion === 1) {
-      if (!orderData.needsAssessment?.purpose) isNextButtonDisabled = true;
-    } else if (currentQuestion === 2) {
-      if (!orderData.needsAssessment?.priorities) isNextButtonDisabled = true;
-    } else if (currentQuestion === 3) {
-      if (!orderData.needsAssessment?.region) isNextButtonDisabled = true;
-    } else if (currentQuestion === 5) { // Banking Intent question
-      if (orderData.needsAssessment?.bankingIntent === undefined) isNextButtonDisabled = true;
+    switch (currentQuestion) {
+      case 0: // Email
+        isNextButtonDisabled = !isEmailValid;
+        break;
+      case 1: // Purpose
+        isNextButtonDisabled = !orderData.needsAssessment?.purpose;
+        break;
+      case 2: // Priorities
+        isNextButtonDisabled = !orderData.needsAssessment?.priorities;
+        break;
+      case 3: // Region
+        isNextButtonDisabled = !orderData.needsAssessment?.region;
+        break;
+      case 4: // Business Description (Optional)
+        isNextButtonDisabled = false; 
+        break;
+      case 5: // Banking Intent
+        isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;
+        break;
+      default:
+        // For any question index not explicitly handled by this switch (e.g. currentQuestion === 6, the final service selection screen),
+        // isNextButtonDisabled will retain its value from (isLoading || isPending).
+        // The "Next" button itself won't be visible on the last screen (question 6), 
+        // as "Proceed to Details" button is shown instead.
+        break;
     }
-    // For question 4 (Business Description), isNextButtonDisabled remains false (unless isLoading/isPending), as it's optional.
   }
   
   const isProceedToDetailsButtonDisabled =
@@ -434,3 +449,4 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
+
