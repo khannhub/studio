@@ -2,7 +2,7 @@
 'use client';
 
 import type { FC } from 'react';
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useRef } from 'react';
 import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance, OrderItem } from '@/lib/types';
 import { INITIAL_ADDONS } from '@/lib/types'; // Ensure INITIAL_ADDONS is imported
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import { Loader2, Wand2, ChevronRight, ChevronLeft, Info, Building, ShieldCheck,
 import { recommendIncorporation, RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import TypingText from '@/components/common/TypingText';
+import { cn } from '@/lib/utils';
 
 const incorporationPackages = [
   { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
@@ -52,7 +54,7 @@ const regionOptions = [
   { id: 'other_region', value: 'Other', label: 'Other', icon: <Info className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
-const ANIMATION_DURATION = 400; // Corresponds to Tailwind animation duration (0.4s)
+const ANIMATION_DURATION = 400; 
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
   orderData,
@@ -61,8 +63,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   updateOrderItem,
   removeOrderItem,
   goToNextStep,
-  isLoading: isGlobalLoading, // Renamed to avoid conflict
-  setIsLoading: setGlobalIsLoading, // Renamed
+  isLoading: isGlobalLoading, 
+  setIsLoading: setGlobalIsLoading, 
 }) => {
   const [currentLogicalQuestion, setCurrentLogicalQuestion] = useState(0);
   const [displayedQuestionIndex, setDisplayedQuestionIndex] = useState(0);
@@ -74,7 +76,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
+  const contentWrapperRef = useRef<HTMLDivElement>(null);
+  const [currentHeight, setCurrentHeight] = useState<string | number>('auto');
+  const [applyHeightTransition, setApplyHeightTransition] = useState(false);
+
   const localAddons = orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
+
+  useEffect(() => {
+    if (contentWrapperRef.current) {
+      const newHeight = contentWrapperRef.current.scrollHeight;
+      setCurrentHeight(newHeight > 0 ? newHeight : 'auto');
+      // Enable transitions after the initial height is set and a short delay
+      const timer = setTimeout(() => {
+        setApplyHeightTransition(true);
+      }, 50); 
+      return () => clearTimeout(timer);
+    }
+  }, []); // Runs once on mount to set initial height
+
+  useEffect(() => {
+    if (applyHeightTransition && contentWrapperRef.current) {
+      const newHeight = contentWrapperRef.current.scrollHeight;
+      setCurrentHeight(newHeight > 0 ? newHeight : 'auto');
+    }
+  }, [displayedQuestionIndex, applyHeightTransition]); // Update height when question changes
 
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
@@ -201,8 +226,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         <Label
           key={option.id}
           htmlFor={`${groupName}-${option.id}`}
-          className={`flex flex-col items-center justify-center text-center p-3 sm:p-4 border rounded-lg cursor-pointer hover:border-primary transition-all duration-150 ease-in-out
-            ${selectedValue === option.value ? 'border-primary ring-2 ring-primary bg-primary/10 shadow-md' : 'border-border bg-card hover:shadow-sm'}`}
+          className={`flex flex-col items-center justify-center text-center p-3 sm:p-4 border rounded-lg cursor-pointer transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl
+            ${selectedValue === option.value ? 'border-primary ring-2 ring-primary bg-primary/10 shadow-md' : 'border-border bg-card hover:shadow-sm hover:border-primary/70'}`}
         >
           <RadioGroupItem value={option.value} id={`${groupName}-${option.id}`} className="sr-only" />
           {option.icon}
@@ -216,58 +241,58 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     // Question 0: Email & Phone
     <div key="q0" className="space-y-4">
       <div>
-        <Label htmlFor="email" className="text-lg font-medium">Let's get started. What's your email?</Label>
+        <TypingText text="Let's get started. What's your email?" speed={30} className="text-lg font-medium block mb-1" as="label" />
         <Input
           id="email"
           type="email"
           placeholder="you@example.com"
           value={orderData.userEmail || ''}
           onChange={(e) => updateOrderData({ userEmail: e.target.value })}
-          className="mt-2"
+          className="mt-1"
           required
         />
       </div>
       <div>
-        <Label htmlFor="phone" className="text-lg font-medium">What's your phone number?</Label>
+        <TypingText text="And your phone number?" speed={30} className="text-lg font-medium block mb-1" as="label" />
         <Input
           id="phone"
           type="tel"
           placeholder="+1 (555) 123-4567"
           value={orderData.userPhone || ''}
           onChange={(e) => updateOrderData({ userPhone: e.target.value })}
-          className="mt-2"
+          className="mt-1"
           required
         />
       </div>
     </div>,
     <div key="q1">
-      <Label className="text-lg font-medium">What is the main purpose of your business?</Label>
+      <TypingText text="What is the main purpose of your business?" speed={30} className="text-lg font-medium block" as="label" />
       {renderSelectionCards(purposeOptions, orderData.needsAssessment?.purpose, (value) => handleNeedsAssessmentChange('purpose', value), 'purpose')}
     </div>,
     <div key="q2">
-      <Label className="text-lg font-medium">What are your key priorities?</Label>
+      <TypingText text="What are your key priorities?" speed={30} className="text-lg font-medium block" as="label" />
       {renderSelectionCards(prioritiesOptions, orderData.needsAssessment?.priorities, (value) => handleNeedsAssessmentChange('priorities', value), 'priorities')}
     </div>,
     <div key="q3">
-      <Label className="text-lg font-medium">What is your primary region of operation?</Label>
+      <TypingText text="What is your primary region of operation?" speed={30} className="text-lg font-medium block" as="label" />
       {renderSelectionCards(regionOptions, orderData.needsAssessment?.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
     </div>,
     <div key="q4">
-      <Label htmlFor="businessDescription" className="text-lg font-medium">Briefly describe your business (optional).</Label>
+      <TypingText text="Briefly describe your business (optional)." speed={30} className="text-lg font-medium block mb-1" as="label" htmlFor="businessDescription" />
        <Textarea
         id="businessDescription"
         placeholder="Provide a short summary of your business activities and goals."
         value={orderData.needsAssessment?.businessDescription || ''}
         onChange={(e) => handleNeedsAssessmentChange('businessDescription', e.target.value)}
-        className="mt-2 min-h-[100px]"
+        className="mt-1 min-h-[100px]"
       />
     </div>,
     <div key="q5" className="space-y-3">
-      <Label className="text-lg font-medium">Do you require banking assistance?</Label>
+      <TypingText text="Do you require banking assistance?" speed={30} className="text-lg font-medium block" as="label" />
       <RadioGroup
         value={orderData.needsAssessment?.bankingIntent === undefined ? "" : String(orderData.needsAssessment.bankingIntent)}
         onValueChange={(value) => handleNeedsAssessmentChange('bankingIntent', value === 'true')}
-        className="flex space-x-4"
+        className="flex space-x-4 mt-2"
       >
         <div className="flex items-center space-x-2">
           <RadioGroupItem value="true" id="bankingYes" />
@@ -320,7 +345,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
               className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4"
             >
               {incorporationPackages.map(pkg => (
-                <Label key={pkg.name} htmlFor={pkg.name} className={`flex flex-col items-start cursor-pointer rounded-lg border bg-card p-4 hover:bg-accent hover:text-accent-foreground transition-all ${orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/10' : 'border-border'}`}>
+                <Label key={pkg.name} htmlFor={pkg.name} className={`flex flex-col items-start cursor-pointer rounded-lg border bg-card p-4 hover:bg-accent hover:text-accent-foreground transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl ${orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/10 shadow-md' : 'border-border hover:border-primary/70'}`}>
                    <div className="flex items-center w-full">
                     <RadioGroupItem value={pkg.name} id={pkg.name} className="mr-2"/>
                     <span className="font-semibold">{pkg.name} - ${pkg.price}</span>
@@ -357,7 +382,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         </CardHeader>
         <CardContent className="space-y-3">
           {localAddons.slice(0,3).map(addon => ( 
-            <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50">
+            <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors">
               <div className="flex items-center">
                 <Switch id={addon.id} checked={addon.selected} onCheckedChange={() => handleAddonToggle(addon.id)} className="mr-3"/>
                 <Label htmlFor={addon.id} className="cursor-pointer">
@@ -387,15 +412,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
     setIsAnimating(true);
     const direction = newLogicalIndex > currentLogicalQuestion ? 'next' : 'prev';
-
     setAnimationName(direction === 'next' ? 'animate-slide-out-to-top' : 'animate-slide-out-to-bottom');
 
     setTimeout(() => {
       setCurrentLogicalQuestion(newLogicalIndex);
-      setDisplayedQuestionIndex(newLogicalIndex);
+      setDisplayedQuestionIndex(newLogicalIndex); // This triggers useEffect for height change
       setAnimationName(direction === 'next' ? 'animate-slide-in-from-bottom' : 'animate-slide-in-from-top');
       
-      // Set isAnimating to false after the "in" animation completes
       setTimeout(() => {
         setIsAnimating(false);
       }, ANIMATION_DURATION);
@@ -433,7 +456,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         isNextButtonDisabled = !orderData.needsAssessment?.region;
         break;
       case 4: 
-        isNextButtonDisabled = false; // Optional field
+        isNextButtonDisabled = false; 
         break;
       case 5:
         isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;
@@ -455,12 +478,16 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <div className="overflow-hidden">
+      <div className="overflow-hidden"> {/* This clips the sliding animation */}
         <div
           key={displayedQuestionIndex}
-          className={animationName}
+          className={cn(
+            animationName,
+            { 'transition-height duration-400 ease-in-out': applyHeightTransition }
+          )}
+          style={{ height: currentHeight }}
         >
-          <div className="p-2">
+          <div className="p-2" ref={contentWrapperRef}> {/* Content for height measurement */}
             {questions[displayedQuestionIndex]}
           </div>
         </div>
