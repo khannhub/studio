@@ -12,7 +12,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST } from '@/lib/types';
+import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, type IncorporationRecommendationItem } from '@/lib/types';
 
 const RecommendIncorporationInputSchema = z.object({
   businessPurpose: z
@@ -29,24 +29,38 @@ export type RecommendIncorporationInput = z.infer<
   typeof RecommendIncorporationInputSchema
 >;
 
-const RecommendIncorporationOutputSchema = z.object({
+const SingleRecommendationSchema = z.object({
   jurisdiction: z
     .string()
     .describe('The recommended jurisdiction for incorporation. MUST be chosen from the provided list.'),
-  state: z.string().optional().describe('The recommended US state, if the jurisdiction is United States of America. This MUST be chosen from the provided list and be in "FullName-Abbreviation" format, e.g., "California-CA".'),
+  state: z.string().optional().describe('The recommended US state, if the jurisdiction is United States of America. This MUST be chosen from the provided list and be in "FullName-Abbreviation" format, e.g., "California-CA". Omit if jurisdiction is not USA.'),
   companyType: z.string().describe('The recommended company type. If jurisdiction is "United States of America", choose from US-specific list. Otherwise, choose from the international list.'),
+  shortDescription: z.string().describe('A very brief (10-15 words) tagline or key feature summary for this specific recommendation. E.g., "Popular for US startups, strong legal framework."'),
   reasoning: z
     .string()
-    .describe('The reasoning behind the jurisdiction (and state, if applicable) and company type recommendation. Use markdown bold syntax (**text**) to highlight the most important phrases or key ideas.'),
+    .describe('The reasoning behind this specific recommendation (jurisdiction, state if applicable, company type). Use markdown bold syntax (**text**) to highlight the most important phrases or key ideas. Keep it concise (2-3 sentences).'),
+  price: z.number().int().min(100).max(5000).describe('A base price (integer between 100 and 5000 USD) for setting up this specific incorporation (jurisdiction and company type). Example: 1299.'),
 });
+
+const RecommendIncorporationOutputSchema = z.object({
+  bestRecommendation: SingleRecommendationSchema.describe("The single best recommendation based on the user's input."),
+  alternativeRecommendations: z.array(SingleRecommendationSchema).length(3).describe("Exactly three alternative recommendations, distinct from the best recommendation and from each other.")
+});
+
 export type RecommendIncorporationOutput = z.infer<
   typeof RecommendIncorporationOutputSchema
 >;
 
+
 export async function recommendIncorporation(
   input: RecommendIncorporationInput
 ): Promise<RecommendIncorporationOutput> {
-  return recommendIncorporationFlow(input);
+  const result = await recommendIncorporationFlow(input);
+  // Ensure the bestRecommendation has the isBestPick flag if we need it later, though not in schema for AI
+  return {
+      ...result,
+      bestRecommendation: { ...result.bestRecommendation, isBestPick: true } as IncorporationRecommendationItem
+  };
 }
 
 const jurisdictionsString = JURISDICTIONS_LIST.join(', ');
@@ -59,24 +73,37 @@ const prompt = ai.definePrompt({
   name: 'recommendIncorporationPrompt',
   input: {schema: RecommendIncorporationInputSchema},
   output: {schema: RecommendIncorporationOutputSchema},
-  prompt: `Based on the business purpose, priorities, and region of operation, recommend the most suitable incorporation jurisdiction and company type.
+  prompt: `You are an expert international business incorporation advisor.
+Based on the user's business purpose, priorities, and primary region of operation, provide one 'bestRecommendation' and exactly three 'alternativeRecommendations' for incorporation.
 
+User Inputs:
   Business Purpose: {{{businessPurpose}}}
   Priorities: {{{priorities}}}
   Region of Operation: {{{region}}}
 
-  Constraints & Instructions:
-  1.  If the user's 'Region of Operation' is "United States of America":
-      a. You MUST set the 'jurisdiction' output field to "United States of America".
-      b. You MUST then recommend a 'state' from the US States list. This 'state' MUST be chosen exclusively from the following list and provided in "FullName-Abbreviation" format (e.g., "California-CA"): ${usStatesString}.
-      c. The 'companyType' MUST be chosen exclusively from this US-specific list: ${usCompanyTypesString}.
-  2.  If the user's 'Region of Operation' is NOT "United States of America":
-      a. The recommended 'jurisdiction' MUST be chosen exclusively from the following list: ${jurisdictionsString}.
-      b. If you choose "United States of America" as the 'jurisdiction' (despite the primary region not being USA), you MUST also recommend a 'state' from the US States list: ${usStatesString}, in "FullName-Abbreviation" format. Otherwise, the 'state' field should be omitted or null.
-      c. If the recommended 'jurisdiction' is "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${usCompanyTypesString}.
-      d. If the recommended 'jurisdiction' is NOT "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${intlCompanyTypesString}.
-  
-  Provide a 'reasoning' for your recommendation. In your 'reasoning', use markdown bold syntax (**text**) to highlight the most important phrases or key ideas, explaining why the chosen jurisdiction (and state, if applicable) and company type are suitable.
+Available Options:
+  Jurisdictions: ${jurisdictionsString}
+  US States (format: FullName-Abbreviation, e.g., "Delaware-DE"): ${usStatesString}
+  US Company Types: ${usCompanyTypesString}
+  International Company Types: ${intlCompanyTypesString}
+
+Output Structure for EACH recommendation (bestRecommendation and each of the 3 alternatives):
+  -   'jurisdiction': MUST be chosen from the 'Jurisdictions' list.
+  -   'state': (Optional) If 'jurisdiction' is "United States of America", MUST recommend a 'state' from the 'US States' list (e.g., "Delaware-DE"). Otherwise, omit 'state'.
+  -   'companyType': If 'jurisdiction' is "United States of America", MUST be chosen from 'US Company Types'. Otherwise, MUST be chosen from 'International Company Types'.
+  -   'shortDescription': A very brief (10-15 words) tagline or key feature summary for this specific recommendation.
+  -   'reasoning': Concise (2-3 sentences) explanation for why this specific option is suitable. Use markdown bold syntax (**text**) to highlight key phrases.
+  -   'price': An estimated base price (integer between 100 and 5000 USD) for this specific incorporation. Example: 1299.
+
+Specific Instructions:
+1.  **Primary Region "United States of America"**:
+    *   If the user's 'Region of Operation' is "United States of America", then the 'jurisdiction' for the 'bestRecommendation' MUST be "United States of America", and you MUST also recommend a 'state'. The alternatives can be international or other US states.
+2.  **Other Primary Regions**:
+    *   If 'Region of Operation' is not "United States of America", you can recommend any suitable jurisdiction from the list, including "United States of America" (with a state) if it's a strong strategic fit.
+3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
+4.  **Pricing**: Provide a realistic base 'price' for each of the four recommendations.
+
+Generate the 'bestRecommendation' and 'alternativeRecommendations' according to the schema.
   `,
 });
 

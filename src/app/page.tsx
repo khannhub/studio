@@ -8,8 +8,16 @@ import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices';
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
-import type { OrderData, OrderItem } from '@/lib/types';
+import type { OrderData, OrderItem, IncorporationRecommendationItem } from '@/lib/types';
 import { STEPS, INITIAL_ADDONS } from '@/lib/types';
+
+// Define incorporationPackages here if it's used in total calculation or summary
+const incorporationPackages = [
+  { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
+  { name: 'Standard', price: 699, features: ['All Basic Features', 'EIN Application Assistance', 'Corporate Kit'] },
+  { name: 'Premium', price: 999, features: ['All Standard Features', 'Priority Processing', 'Bank Account Opening Support'] },
+];
+
 
 const initialOrderData: OrderData = {
   userEmail: '',
@@ -25,12 +33,10 @@ const initialOrderData: OrderData = {
     jurisdiction: '',
     state: '',
     companyType: '',
-    packageName: '',
-    price: 0,
-    aiRecommendedJurisdiction: '',
-    aiRecommendedState: '',
-    aiRecommendedCompanyType: '',
-    aiRecommendedReasoning: '',
+    price: 0, // Base price for the selected jurisdiction/type
+    packageName: '', // Basic, Standard, Premium
+    aiBestRecommendation: null,
+    aiAlternativeRecommendations: [],
   },
   bankingAssistance: {
     selected: false,
@@ -82,28 +88,46 @@ export default function WizardPage() {
     const items: OrderItem[] = [];
     const { incorporation, bankingAssistance, addOns } = orderData;
 
-    if (incorporation?.packageName && incorporation.price && incorporation.price > 0) {
-      const jurisdictionDisplay = incorporation.jurisdiction || incorporation.aiRecommendedJurisdiction || 'Selected Jurisdiction';
-      const stateDisplay = incorporation.jurisdiction === 'United States of America' && incorporation.state ? ` (${incorporation.state.split('-')[0]})` : '';
-      const companyTypeDisplay = incorporation.companyType || incorporation.aiRecommendedCompanyType || 'Company Type';
-      const reasoningDisplay = incorporation.aiRecommendedReasoning ? `AI Suggestion: ${incorporation.aiRecommendedJurisdiction || ''}${incorporation.aiRecommendedState ? ` (${incorporation.aiRecommendedState.split('-')[0]})` : ''} ${incorporation.aiRecommendedCompanyType || ''}. Reasoning: ${incorporation.aiRecommendedReasoning.substring(0,70)}...` : '';
+    if (incorporation?.jurisdiction && incorporation.companyType && incorporation.price !== undefined) {
+      let name = `${incorporation.jurisdiction}`;
+      if (incorporation.jurisdiction === 'United States of America' && incorporation.state) {
+        const stateLabel = incorporation.state.split('-')[0];
+        name += ` (${stateLabel})`;
+      }
+      name += ` ${incorporation.companyType}`;
 
+      let totalIncorporationPrice = incorporation.price || 0; // Base price for jurisdiction/type
+      let description = `Formation in ${incorporation.jurisdiction}.`;
 
-      items.push({
-        id: 'incorporation_service',
-        name: `${jurisdictionDisplay}${stateDisplay} ${companyTypeDisplay} - ${incorporation.packageName} Package`,
-        price: incorporation.price,
-        quantity: 1,
-        description: `Includes ${incorporation.packageName} features. ${reasoningDisplay}`.trim(),
-      });
+      if (incorporation.packageName) {
+        const pkg = incorporationPackages.find(p => p.name === incorporation.packageName);
+        if (pkg) {
+          name += ` - ${incorporation.packageName} Package`;
+          totalIncorporationPrice += pkg.price;
+          description += ` Includes ${incorporation.packageName} features.`;
+        }
+      }
+      
+      // Only add if base price is known (not 0 or TBD for custom)
+      // Or if a package is selected (which implies a base price was acceptable)
+      if (totalIncorporationPrice > 0 || (incorporation.price === 0 && incorporation.packageName) ) {
+         items.push({
+            id: 'incorporation_service',
+            name: name,
+            price: totalIncorporationPrice,
+            quantity: 1,
+            description: description.trim(),
+          });
+      }
     }
+
     if (bankingAssistance?.selected && bankingAssistance.price && bankingAssistance.price > 0) {
       items.push({
         id: 'banking_assistance',
         name: 'Banking Assistance',
         price: bankingAssistance.price,
         quantity: 1,
-        description: bankingAssistance.option || `Access to banking partners. ${bankingAssistance.reasoning ? 'AI Reasoning: '+bankingAssistance.reasoning.substring(0,100)+'...' : ''}`.trim(),
+        description: bankingAssistance.option || `Access to banking partners. ${bankingAssistance.reasoning ? 'Reasoning: '+bankingAssistance.reasoning.substring(0,100)+'...' : ''}`.trim(),
       });
     }
     addOns?.forEach(addon => {
@@ -113,6 +137,9 @@ export default function WizardPage() {
     });
     
     setDerivedOrderItems(items);
+    // Update orderData.orderItems directly if you want it to persist across all state updates
+    // This might be redundant if derivedOrderItems is always calculated correctly
+    // For now, let's keep it to ensure data consistency if orderItems is ever directly used by steps
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
@@ -188,7 +215,7 @@ export default function WizardPage() {
   const stepProps = {
     orderData,
     updateOrderData: updateOrderDataHandler,
-    orderItems: derivedOrderItems,
+    orderItems: derivedOrderItems, // Pass derived items for display
     addOrderItem: addOrderItemHandler,
     updateOrderItem: updateOrderItemHandler,
     removeOrderItem: removeOrderItemHandler,
@@ -222,3 +249,4 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
+

@@ -7,25 +7,36 @@ export interface OrderItem {
   description?: string;
 }
 
+export interface IncorporationRecommendationItem {
+  jurisdiction: string;
+  state?: string; // For US states, format "FullName-Abbreviation"
+  companyType: string;
+  shortDescription: string; // A brief tagline for the recommendation card
+  reasoning: string; // Detailed reasoning, can include markdown
+  price: number; // Base price for this specific jurisdiction/type combination
+  isBestPick?: boolean; // Flag if this is the top recommendation
+}
+
 export interface IncorporationDetails {
   jurisdiction?: string; // User's current selection
   state?: string; // User's current selection for US state, format "FullName-Abbreviation"
   companyType?: string; // User's current selection
-  packageName?: string;
-  processingTime?: string;
-  price?: number;
-  
-  aiRecommendedJurisdiction?: string; // AI's original recommendation
-  aiRecommendedState?: string; // AI's original recommendation for US state
-  aiRecommendedCompanyType?: string; // AI's original recommendation
-  aiRecommendedReasoning?: string; // AI's original reasoning
+  price?: number; // Base price of the selected jurisdiction/state/companyType combination
+
+  packageName?: string; // e.g., 'Basic', 'Standard', 'Premium'
+  // packagePrice is derived from incorporationPackages in Step2SelectServices
+  // processingTime field is effectively covered by packageName
+
+  // Store all AI recommendations
+  aiBestRecommendation?: IncorporationRecommendationItem | null;
+  aiAlternativeRecommendations?: IncorporationRecommendationItem[];
 }
 
 export interface BankingAssistance {
   selected?: boolean;
   option?: string;
   price?: number;
-  reasoning?: string; 
+  reasoning?: string;
 }
 
 export interface AddOn {
@@ -51,7 +62,6 @@ export interface Person {
   fullName?: string;
   email?: string;
   phone?: string;
-  // Add other relevant fields like DOB, nationality, address if needed for directors/shareholders
 }
 
 export interface ShareholderInfo extends Person {
@@ -70,8 +80,8 @@ export interface Address {
 }
 
 export interface OrderData {
-  userEmail?: string; // Step 1: Initial email
-  userPhone?: string; // Step 1: Initial phone
+  userEmail?: string;
+  userPhone?: string;
   needsAssessment?: {
     purpose?: string;
     priorities?: string;
@@ -82,7 +92,7 @@ export interface OrderData {
   incorporation?: IncorporationDetails;
   bankingAssistance?: BankingAssistance;
   addOns?: AddOn[];
-  
+
   companyNames?: CompanyNameChoices;
   directors?: Person[];
   shareholders?: ShareholderInfo[];
@@ -92,16 +102,16 @@ export interface OrderData {
 
   billingAddress?: Address & { useDeliveryAddress?: boolean; usePrimaryContactAddress?: boolean; };
   paymentMethod?: "card" | "paypal" | "bank_transfer";
-  paymentDetails?: { 
-    cardNumber?: string; 
+  paymentDetails?: {
+    cardNumber?: string;
     expiryDate?: string;
     cvv?: string;
   };
-  
+
   orderId?: string;
   orderStatus?: "success" | "pending" | "failed";
   paymentDate?: string;
-  orderItems?: OrderItem[]; 
+  orderItems?: OrderItem[];
 }
 
 export interface StepComponentProps {
@@ -135,57 +145,57 @@ export const INITIAL_ADDONS: AddOn[] = [
 ];
 
 export const JURISDICTIONS_LIST = [
-  'Anguilla', 'Bahamas', 'Belize', 'British Virgin Islands', 'Cayman Islands', 
-  'Cyprus', 'Gibraltar', 'Hong Kong', 'Malaysia', 'Malta', 'Marshall Islands', 
-  'Mauritius', 'Netherlands', 'Panama', 'Saint Lucia', 'Samoa', 'Seychelles', 
-  'Singapore', 'St. Vincent', 'St. Kitts and Nevis', 'Swiss', 'UAE', 
+  'Anguilla', 'Bahamas', 'Belize', 'British Virgin Islands', 'Cayman Islands',
+  'Cyprus', 'Gibraltar', 'Hong Kong', 'Malaysia', 'Malta', 'Marshall Islands',
+  'Mauritius', 'Netherlands', 'Panama', 'Saint Lucia', 'Samoa', 'Seychelles',
+  'Singapore', 'St. Vincent', 'St. Kitts and Nevis', 'Swiss', 'UAE',
   'United Kingdom', 'United States of America', 'Vanuatu', 'Vietnam'
 ];
 
 export const US_STATES_LIST = [
-  { value: "Alabama-AL", label: "Alabama" }, { value: "Alaska-AK", label: "Alaska" }, 
-  { value: "Arizona-AZ", label: "Arizona" }, { value: "Arkansas-AR", label: "Arkansas" }, 
-  { value: "California-CA", label: "California" }, { value: "Colorado-CO", label: "Colorado" }, 
-  { value: "Connecticut-CT", label: "Connecticut" }, { value: "Delaware-DE", label: "Delaware" }, 
-  { value: "District of Columbia-DC", label: "District of Columbia" }, { value: "Florida-FL", label: "Florida" }, 
-  { value: "Georgia-GA", label: "Georgia" }, { value: "Hawaii-HI", label: "Hawaii" }, 
-  { value: "Idaho-ID", label: "Idaho" }, { value: "Illinois-IL", label: "Illinois" }, 
-  { value: "Indiana-IN", label: "Indiana" }, { value: "Iowa-IA", label: "Iowa" }, 
-  { value: "Kansas-KS", label: "Kansas" }, { value: "Kentucky-KY", label: "Kentucky" }, 
-  { value: "Louisiana-LA", label: "Louisiana" }, { value: "Maine-ME", label: "Maine" }, 
-  { value: "Maryland-MD", label: "Maryland" }, { value: "Massachusetts-MA", label: "Massachusetts" }, 
-  { value: "Michigan-MI", label: "Michigan" }, { value: "Minnesota-MN", label: "Minnesota" }, 
-  { value: "Mississippi-MS", label: "Mississippi" }, { value: "Missouri-MO", label: "Missouri" }, 
-  { value: "Nebraska-NE", label: "Nebraska" }, { value: "Nevada-NV", label: "Nevada" }, 
-  { value: "New Hampshire-NH", label: "New Hampshire" }, { value: "New Jersey-NJ", label: "New Jersey" }, 
-  { value: "New Mexico-NM", label: "New Mexico" }, { value: "New York-NY", label: "New York" }, 
-  { value: "North Carolina-NC", label: "North Carolina" }, { value: "North Dakota-ND", label: "North Dakota" }, 
-  { value: "Ohio-OH", label: "Ohio" }, { value: "Oklahoma-OK", label: "Oklahoma" }, 
-  { value: "Oregon-OR", label: "Oregon" }, { value: "Pennsylvania-PA", label: "Pennsylvania" }, 
-  { value: "Rhode Island-RI", label: "Rhode Island" }, { value: "South Carolina-SC", label: "South Carolina" }, 
-  { value: "South Dakota-SD", label: "South Dakota" }, { value: "Tennessee-TN", label: "Tennessee" }, 
-  { value: "Texas-TX", label: "Texas" }, { value: "Utah-UT", label: "Utah" }, 
-  { value: "Vermont-VT", label: "Vermont" }, { value: "Virginia-VA", label: "Virginia" }, 
-  { value: "Washington-WA", label: "Washington" }, { value: "West Virginia-WV", label: "West Virginia" }, 
+  { value: "Alabama-AL", label: "Alabama" }, { value: "Alaska-AK", label: "Alaska" },
+  { value: "Arizona-AZ", label: "Arizona" }, { value: "Arkansas-AR", label: "Arkansas" },
+  { value: "California-CA", label: "California" }, { value: "Colorado-CO", label: "Colorado" },
+  { value: "Connecticut-CT", label: "Connecticut" }, { value: "Delaware-DE", label: "Delaware" },
+  { value: "District of Columbia-DC", label: "District of Columbia" }, { value: "Florida-FL", label: "Florida" },
+  { value: "Georgia-GA", label: "Georgia" }, { value: "Hawaii-HI", label: "Hawaii" },
+  { value: "Idaho-ID", label: "Idaho" }, { value: "Illinois-IL", label: "Illinois" },
+  { value: "Indiana-IN", label: "Indiana" }, { value: "Iowa-IA", label: "Iowa" },
+  { value: "Kansas-KS", label: "Kansas" }, { value: "Kentucky-KY", label: "Kentucky" },
+  { value: "Louisiana-LA", label: "Louisiana" }, { value: "Maine-ME", label: "Maine" },
+  { value: "Maryland-MD", label: "Maryland" }, { value: "Massachusetts-MA", label: "Massachusetts" },
+  { value: "Michigan-MI", label: "Michigan" }, { value: "Minnesota-MN", label: "Minnesota" },
+  { value: "Mississippi-MS", label: "Mississippi" }, { value: "Missouri-MO", label: "Missouri" },
+  { value: "Nebraska-NE", label: "Nebraska" }, { value: "Nevada-NV", label: "Nevada" },
+  { value: "New Hampshire-NH", label: "New Hampshire" }, { value: "New Jersey-NJ", label: "New Jersey" },
+  { value: "New Mexico-NM", label: "New Mexico" }, { value: "New York-NY", label: "New York" },
+  { value: "North Carolina-NC", label: "North Carolina" }, { value: "North Dakota-ND", label: "North Dakota" },
+  { value: "Ohio-OH", label: "Ohio" }, { value: "Oklahoma-OK", label: "Oklahoma" },
+  { value: "Oregon-OR", label: "Oregon" }, { value: "Pennsylvania-PA", label: "Pennsylvania" },
+  { value: "Rhode Island-RI", label: "Rhode Island" }, { value: "South Carolina-SC", label: "South Carolina" },
+  { value: "South Dakota-SD", label: "South Dakota" }, { value: "Tennessee-TN", label: "Tennessee" },
+  { value: "Texas-TX", label: "Texas" }, { value: "Utah-UT", label: "Utah" },
+  { value: "Vermont-VT", label: "Vermont" }, { value: "Virginia-VA", label: "Virginia" },
+  { value: "Washington-WA", label: "Washington" }, { value: "West Virginia-WV", label: "West Virginia" },
   { value: "Wisconsin-WI", label: "Wisconsin" }, { value: "Wyoming-WY", label: "Wyoming" }
 ];
 
 export const US_COMPANY_TYPES_LIST = [
-  'Limited Liability Company', 
-  'S Corporation', 
+  'Limited Liability Company',
+  'S Corporation',
   'C Corporation'
 ];
 
 export const INTERNATIONAL_COMPANY_TYPES_LIST = [
-  'Company Limited', 
+  'Company Limited',
   'Limited Liability Company', // Can exist internationally
-  'International Business Company', 
-  'Private Limited Company', 
+  'International Business Company',
+  'Private Limited Company',
   'Public Limited Company',
   'Limited by Shares',
-  'Global Business Company', 
+  'Global Business Company',
   'Authorised Company',
-  'Limited Liability Partnership', 
-  'Exempted Company', 
+  'Limited Liability Partnership',
+  'Exempted Company',
   'Corporation' // Generic, can exist outside US
 ];

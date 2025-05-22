@@ -3,7 +3,7 @@
 
 import type { FC } from 'react';
 import { useState, useTransition, useEffect } from 'react';
-import type { StepComponentProps, OrderData, IncorporationDetails } from '@/lib/types';
+import type { StepComponentProps, OrderData, IncorporationDetails, IncorporationRecommendationItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,10 +11,10 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Wand2, ChevronRight, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout, MapPin, Flag } from 'lucide-react';
-import { recommendIncorporation, type RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
+import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import TypingText from '@/components/common/TypingText';
+// import TypingText from '@/components/common/TypingText'; // Not used for section titles anymore
 
 const purposeOptions = [
   { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Sales', icon: <ShoppingCart className="h-5 w-5 mb-2 text-primary" /> },
@@ -31,17 +31,17 @@ const prioritiesOptions = [
   { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Award className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_priority', value: 'Other', label: 'Other Priority', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon to briefcase for consistency
+  { id: 'other_priority', value: 'Other', label: 'Other Priority', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const regionOptions = [
   { id: 'usa', value: 'United States of America', label: 'USA', icon: <Flag className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'global_international', value: 'Global / International (Non-USA)', label: 'Global / Intl.', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'global_international', value: 'Global / International (Non-USA Focus)', label: 'Global / Intl.', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'asia', value: 'Asia (e.g., Singapore, Hong Kong)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'mena', value: 'Middle East & Africa', label: 'MENA', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'mena', value: 'Middle East & North Africa (MENA)', label: 'MENA', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'latam_caribbean', value: 'Latin America & Caribbean', label: 'LATAM & Caribbean', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'canada', value: 'Canada', label: 'Canada', icon: <MapPin className="h-5 w-5 mb-2 text-primary" /> }, // Example, consider better icon
+  { id: 'canada', value: 'Canada', label: 'Canada', icon: <MapPin className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'other_region', value: 'Other Specific Region', label: 'Other Region', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
@@ -81,7 +81,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     };
 
     const inputsHaveChangedOrNoRecExists = !lastSuccessfulAiCallInputs ||
-      !orderData.incorporation?.aiRecommendedReasoning ||
+      !orderData.incorporation?.aiBestRecommendation || // Check if best recommendation exists
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
@@ -97,39 +97,56 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     
     startTransition(async () => {
       try {
-        const recommendation = await recommendIncorporation(currentAiInputs);
+        const recommendations: RecommendIncorporationOutput = await recommendIncorporation(currentAiInputs);
+        const bestRec = recommendations.bestRecommendation;
         
-        // If AI recommends USA or if primary region is USA, ensure jurisdiction is set to USA
-        const finalJurisdiction = currentAiInputs.region === 'United States of America' 
-            ? 'United States of America' 
-            : recommendation.jurisdiction;
-        const finalState = finalJurisdiction === 'United States of America' ? recommendation.state : '';
+        let finalJurisdiction = bestRec.jurisdiction;
+        let finalState = bestRec.state;
 
-        updateOrderData(prev => ({
-          ...prev,
-          incorporation: { 
+        if (currentAiInputs.region === 'United States of America') {
+            finalJurisdiction = 'United States of America';
+            // Ensure state is set if AI somehow missed it for US primary region, though prompt should cover this
+            finalState = bestRec.state || (US_STATES_LIST.find(s => s.label === "Delaware")?.value); // Default to Delaware if AI missed
+        }
+        
+        updateOrderData(prev => {
+          const newIncorporationDetails: IncorporationDetails = {
             ...prev.incorporation,
+            // Set current user selections to the AI's best pick initially
             jurisdiction: finalJurisdiction,
             state: finalState,
-            companyType: recommendation.companyType,
-            aiRecommendedJurisdiction: recommendation.jurisdiction, // Store AI's raw recommendation
-            aiRecommendedState: recommendation.state, // Store AI's raw recommendation
-            aiRecommendedCompanyType: recommendation.companyType,
-            aiRecommendedReasoning: recommendation.reasoning,
-          },
-          ...(prev.needsAssessment?.bankingIntent && {
-            bankingAssistance: {
-                ...prev.bankingAssistance,
-                reasoning: `Based on your profile, we suggest considering banking options suitable for ${finalJurisdiction}${finalState ? ` (${finalState.split('-')[0]})` : ''} (${recommendation.companyType}).`,
-            }
-          })
-        }));
+            companyType: bestRec.companyType,
+            price: bestRec.price, // Base price from AI's best pick
+
+            // Store all AI recommendations
+            aiBestRecommendation: { ...bestRec, isBestPick: true },
+            aiAlternativeRecommendations: recommendations.alternativeRecommendations,
+          };
+
+          let bankingReasoning = prev.bankingAssistance?.reasoning;
+          if (prev.needsAssessment?.bankingIntent) {
+            const recStateDisplay = finalState ? ` (${finalState.split('-')[0]})` : '';
+            bankingReasoning = `Based on your profile, we suggest considering banking options suitable for ${finalJurisdiction}${recStateDisplay} (${bestRec.companyType}).`;
+          }
+          
+          return {
+            ...prev,
+            incorporation: newIncorporationDetails,
+            ...(prev.needsAssessment?.bankingIntent && {
+              bankingAssistance: {
+                  ...prev.bankingAssistance,
+                  reasoning: bankingReasoning,
+              }
+            })
+          };
+        });
+
         setLastSuccessfulAiCallInputs(currentAiInputs); 
         goToNextStep();
 
       } catch (error) {
         console.error("Error getting recommendation:", error);
-        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations at this time. Please try again.", variant: "destructive" });
+        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations at this time. Please try again or ensure all fields are completed.", variant: "destructive" });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
