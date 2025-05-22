@@ -1,3 +1,4 @@
+
 // src/ai/flows/recommend-incorporation.ts
 'use server';
 
@@ -11,6 +12,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { JURISDICTIONS_LIST, US_STATES_LIST } from '@/lib/types';
 
 const RecommendIncorporationInputSchema = z.object({
   businessPurpose: z
@@ -30,11 +32,12 @@ export type RecommendIncorporationInput = z.infer<
 const RecommendIncorporationOutputSchema = z.object({
   jurisdiction: z
     .string()
-    .describe('The recommended jurisdiction for incorporation.'),
-  companyType: z.string().describe('The recommended company type.'),
+    .describe('The recommended jurisdiction for incorporation. MUST be chosen from the provided list.'),
+  state: z.string().optional().describe('The recommended US state, if the jurisdiction is United States of America. This MUST be chosen from the provided list and be in "FullName-Abbreviation" format, e.g., "California-CA".'),
+  companyType: z.string().describe('The recommended company type (e.g., LLC, Ltd, IBC).'),
   reasoning: z
     .string()
-    .describe('The reasoning behind the jurisdiction and company type recommendation.'),
+    .describe('The reasoning behind the jurisdiction (and state, if applicable) and company type recommendation.'),
 });
 export type RecommendIncorporationOutput = z.infer<
   typeof RecommendIncorporationOutputSchema
@@ -46,6 +49,10 @@ export async function recommendIncorporation(
   return recommendIncorporationFlow(input);
 }
 
+const jurisdictionsString = JURISDICTIONS_LIST.join(', ');
+const usStatesString = US_STATES_LIST.map(s => `${s.label} (${s.value})`).join('; ');
+
+
 const prompt = ai.definePrompt({
   name: 'recommendIncorporationPrompt',
   input: {schema: RecommendIncorporationInputSchema},
@@ -56,8 +63,13 @@ const prompt = ai.definePrompt({
   Priorities: {{{priorities}}}
   Region of Operation: {{{region}}}
 
-  Provide a brief reasoning for your recommendation.
-  `, // Ensure that the prompt is well-formatted and clear
+  Constraints:
+  1. The recommended 'jurisdiction' MUST be chosen exclusively from the following list: ${jurisdictionsString}.
+  2. If 'jurisdiction' is "United States of America", you MUST also recommend a 'state'. This 'state' MUST be chosen exclusively from the following list and provided in "FullName-Abbreviation" format (e.g., "California-CA"): ${usStatesString}. If 'jurisdiction' is not "United States of America", the 'state' field should be omitted or null.
+  3. Recommend a common 'companyType' suitable for the chosen jurisdiction and business needs (e.g., LLC, Ltd, Corp, IBC).
+
+  Provide a brief 'reasoning' for your recommendation, explaining why the chosen jurisdiction (and state, if applicable) and company type are suitable, considering the provided lists.
+  `,
 });
 
 const recommendIncorporationFlow = ai.defineFlow(

@@ -14,6 +14,7 @@ import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Targe
 import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import TypingText from '@/components/common/TypingText';
 
 const purposeOptions = [
   { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Online Sales', icon: <ShoppingCart className="h-5 w-5 mb-2 text-primary" /> },
@@ -21,7 +22,7 @@ const purposeOptions = [
   { id: 'holding', value: 'Holding Company / Asset Protection', label: 'Holding / Asset Protection', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'software', value: 'Software / Technology Development', label: 'Tech / Software', icon: <Cpu className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'trading', value: 'Trading / Investment', label: 'Trading / Investment', icon: <TrendingUp className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_purpose', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_purpose', value: 'Other', label: 'Other', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
 ];
 
 const prioritiesOptions = [
@@ -30,7 +31,7 @@ const prioritiesOptions = [
   { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Award className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_priority', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_priority', value: 'Other', label: 'Other', icon: <MailQuestion className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
 ];
 
 const regionOptions = [
@@ -40,7 +41,7 @@ const regionOptions = [
   { id: 'asia', value: 'Asia (Singapore, Hong Kong, etc.)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'mena', value: 'Middle East & Africa', label: 'Middle East & Africa', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'latam', value: 'Latin America & Caribbean', label: 'Latin America', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_region', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_region', value: 'Other', label: 'Other', icon: <FileText className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
 ];
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
@@ -76,13 +77,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       region: orderData.needsAssessment.region,
     };
 
-    // Check if inputs have changed since last successful AI call
+    // Check if inputs have changed since last successful AI call OR if no recommendation exists yet
     const inputsHaveChanged = !lastSuccessfulAiCallInputs ||
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
 
-    if (!inputsHaveChanged && orderData.incorporation?.reasoning) {
+    if (!inputsHaveChanged && orderData.incorporation?.aiRecommendedReasoning) {
       // Inputs haven't changed and a recommendation exists, proceed directly
       goToNextStep();
       return;
@@ -97,27 +98,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         
         updateOrderData(prev => ({
           ...prev,
-          incorporation: {
-            ...prev.incorporation,
+          incorporation: { // Set both user-selectable and AI-recommended fields
+            ...prev.incorporation, // Preserve existing package/price if any
             jurisdiction: recommendation.jurisdiction,
+            state: recommendation.state,
             companyType: recommendation.companyType,
-            reasoning: recommendation.reasoning,
+            aiRecommendedJurisdiction: recommendation.jurisdiction,
+            aiRecommendedState: recommendation.state,
+            aiRecommendedCompanyType: recommendation.companyType,
+            aiRecommendedReasoning: recommendation.reasoning,
           },
           ...(prev.needsAssessment?.bankingIntent && {
             bankingAssistance: {
                 ...prev.bankingAssistance,
-                reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction} (${recommendation.companyType}).`,
+                reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction}${recommendation.state ? ` (${recommendation.state.split('-')[0]})` : ''} (${recommendation.companyType}).`,
             }
           })
         }));
         setLastSuccessfulAiCallInputs(currentAiInputs); // Store successful inputs
-        toast({ title: "AI Recommendations Ready", description: "Proceeding to service selection.", variant: "default" });
+        // toast({ title: "AI Recommendations Ready", description: "Proceeding to service selection.", variant: "default" }); // No toast here, directly go next
         goToNextStep();
 
       } catch (error) {
         console.error("Error getting AI recommendation:", error);
-        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again or proceed manually if options are available.", variant: "destructive" });
-        // Do not clear lastSuccessfulAiCallInputs here, so if they retry with same inputs it won't call AI again if it previously succeeded
+        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again.", variant: "destructive" });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
@@ -171,12 +175,10 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   return (
     <div className="space-y-8">
       <div className="space-y-6 py-2">
-        <div>
-          <h2 className="text-xl font-semibold mb-1 flex items-center">
-             Your Contact Information
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">Please provide your primary contact details.</p>
-        </div>
+        <h2 className="text-xl font-semibold mb-1 flex items-center">
+           Your Contact Information
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">Please provide your primary contact details.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <Label htmlFor="email" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary"/> Email</Label>
@@ -206,28 +208,34 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       </div>
 
       <div className="space-y-6 py-2">
-        <div>
-          <h2 className="text-xl font-semibold mb-1 flex items-center">
-             Understanding Your Needs
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">Tell us about your business to help us recommend the best options.</p>
-        </div>
+        <h2 className="text-xl font-semibold mb-1 flex items-center">
+           Understanding Your Needs
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">Tell us about your business to help us recommend the best options.</p>
         
         <div className="space-y-6">
           <div>
-            <Label className="flex items-center text-base font-medium"><MailQuestion className="mr-2 h-4 w-4 text-primary"/> What is the main purpose of your business?</Label>
+            <Label className="flex items-center text-base font-medium">
+                <TypingText text="What is the main purpose of your business?" speed={25} as="span" className="flex items-center" />
+            </Label>
             {renderSelectionCards(purposeOptions, orderData.needsAssessment?.purpose, (value) => handleNeedsAssessmentChange('purpose', value), 'purpose')}
           </div>
           <div>
-            <Label className="flex items-center text-base font-medium"><Target className="mr-2 h-4 w-4 text-primary"/> What are your key priorities?</Label>
+            <Label className="flex items-center text-base font-medium">
+                 <TypingText text="What are your key priorities?" speed={25} as="span" className="flex items-center" />
+            </Label>
             {renderSelectionCards(prioritiesOptions, orderData.needsAssessment?.priorities, (value) => handleNeedsAssessmentChange('priorities', value), 'priorities')}
           </div>
           <div>
-            <Label className="flex items-center text-base font-medium"><Globe className="mr-2 h-4 w-4 text-primary"/> What is your primary region of operation?</Label>
+            <Label className="flex items-center text-base font-medium">
+                 <TypingText text="What is your primary region of operation?" speed={25} as="span" className="flex items-center" />
+            </Label>
             {renderSelectionCards(regionOptions, orderData.needsAssessment?.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
           </div>
           <div>
-            <Label htmlFor="businessDescription" className="flex items-center text-base font-medium"><FileText className="mr-2 h-4 w-4 text-primary"/> Briefly describe your business (optional).</Label>
+            <Label htmlFor="businessDescription" className="flex items-center text-base font-medium">
+                 <TypingText text="Briefly describe your business (optional)." speed={25} as="span" className="flex items-center" />
+            </Label>
             <Textarea
               id="businessDescription"
               placeholder="Provide a short summary of your business activities and goals."
@@ -237,7 +245,9 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             />
           </div>
            <div>
-            <Label className="flex items-center text-base font-medium mb-2"><Building className="mr-2 h-4 w-4 text-primary"/> Do you require banking assistance?</Label>
+            <Label className="flex items-center text-base font-medium mb-2">
+                 <TypingText text="Do you require banking assistance?" speed={25} as="span" className="flex items-center" />
+            </Label>
             <div className="flex items-center space-x-3">
               <Switch
                 id="bankingIntentSwitch"
@@ -265,4 +275,3 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
-    

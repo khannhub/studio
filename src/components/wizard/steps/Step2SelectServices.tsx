@@ -2,16 +2,16 @@
 'use client';
 
 import type { FC } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance, OrderItem } from '@/lib/types';
-import { INITIAL_ADDONS } from '@/lib/types';
+import { INITIAL_ADDONS, JURISDICTIONS_LIST, US_STATES_LIST, COMPANY_TYPES_LIST } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wand2, ChevronRight, ChevronLeft, Info, Building } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import TypingText from '@/components/common/TypingText';
@@ -34,80 +34,89 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   isLoading,
 }) => {
   
-  const localAddons = orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
+  const localAddons = useMemo(() => {
+    return orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
+  }, [orderData.addOns]);
 
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
-    if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.reasoning && !orderData.bankingAssistance?.selected) {
-        if (orderData.bankingAssistance?.reasoning) {
+    if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.aiRecommendedReasoning && !orderData.bankingAssistance?.selected) {
+        if (orderData.bankingAssistance?.reasoning) { // AI reasoning for banking
             handleBankingAssistSelect(true, orderData.bankingAssistance.reasoning);
         }
     }
-  }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.reasoning, orderData.bankingAssistance]);
+  }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.aiRecommendedReasoning, orderData.bankingAssistance]);
 
+  const updateIncorporationServiceOrderItem = (updatedIncorporationData: IncorporationDetails) => {
+    const { packageName, price, jurisdiction, state, companyType, aiRecommendedReasoning } = updatedIncorporationData;
+    if (packageName && price && price > 0) {
+      const jurisdictionDisplay = jurisdiction || 'Selected Jurisdiction';
+      const stateDisplay = jurisdiction === 'United States of America' && state ? ` (${state.split('-')[0]})` : '';
+      const companyTypeDisplay = companyType || 'Company Type';
+      
+      const aiReasoningText = aiRecommendedReasoning 
+          ? `Original AI Suggestion: ${updatedIncorporationData.aiRecommendedJurisdiction || ''}${updatedIncorporationData.aiRecommendedState ? ` (${updatedIncorporationData.aiRecommendedState.split('-')[0]})` : ''} ${updatedIncorporationData.aiRecommendedCompanyType || ''}. Reasoning: ${aiRecommendedReasoning.substring(0,70)}...` 
+          : '';
+
+      const itemName = `${jurisdictionDisplay}${stateDisplay} ${companyTypeDisplay} - ${packageName} Package`;
+      const itemDescription = `Includes ${packageName} features. ${aiReasoningText}`.trim();
+
+      const existingItem = orderData.orderItems?.find(item => item.id === 'incorporation_service');
+      const itemPayload = {
+          name: itemName,
+          price: price,
+          quantity: 1,
+          description: itemDescription
+      };
+
+      if (existingItem) {
+        updateOrderItem('incorporation_service', itemPayload);
+      } else {
+        addOrderItem({ id: 'incorporation_service', ...itemPayload });
+      }
+    } else if (orderData.orderItems?.find(item => item.id === 'incorporation_service')) {
+        removeOrderItem('incorporation_service');
+    }
+  };
+  
   const handleIncorporationFieldChange = (field: keyof IncorporationDetails, value: string) => {
-    updateOrderData(prev => ({
-      incorporation: {
+    updateOrderData(prev => {
+      const newIncorporationData = {
         ...prev.incorporation,
         [field]: value,
+      };
+      // Clear state if jurisdiction is not USA
+      if (field === 'jurisdiction' && value !== 'United States of America') {
+        newIncorporationData.state = '';
       }
-    }));
-    if (orderData.incorporation?.packageName) {
-      const selectedPkg = incorporationPackages.find(pkg => pkg.name === orderData.incorporation!.packageName);
-      if (selectedPkg) {
-        const newJurisdiction = field === 'jurisdiction' ? value : (orderData.incorporation?.jurisdiction || '');
-        const newCompanyType = field === 'companyType' ? value : (orderData.incorporation?.companyType || '');
-        updateOrderItem('incorporation_service', {
-            name: `${newJurisdiction || 'Selected Jurisdiction'} ${newCompanyType || 'Company Type'} - ${selectedPkg.name} Package`,
-            description: `Includes ${selectedPkg.name} features. Jurisdiction: ${newJurisdiction}, Type: ${newCompanyType}. ${orderData.incorporation?.reasoning ? 'AI Reasoning: '+orderData.incorporation.reasoning.substring(0,100)+'...' : ''}`.trim(),
-        });
-      }
-    }
+      updateIncorporationServiceOrderItem(newIncorporationData as IncorporationDetails);
+      return { incorporation: newIncorporationData };
+    });
   };
 
   const handleIncorporationPackageSelect = (packageName: string) => {
     const selectedPkg = incorporationPackages.find(pkg => pkg.name === packageName);
     if (selectedPkg) {
-      const newIncorporationData: IncorporationDetails = {
-        jurisdiction: orderData.incorporation?.jurisdiction || '', 
-        companyType: orderData.incorporation?.companyType || '',   
-        reasoning: orderData.incorporation?.reasoning || '',     
-        packageName: selectedPkg.name,
-        price: selectedPkg.price,
-      };
-      updateOrderData({ incorporation: newIncorporationData });
-
-      const itemName = `${newIncorporationData.jurisdiction || 'Selected Jurisdiction'} ${newIncorporationData.companyType || 'Company Type'} - ${selectedPkg.name} Package`;
-      const itemDescription = `Includes ${selectedPkg.name} features. Jurisdiction: ${newIncorporationData.jurisdiction}, Type: ${newIncorporationData.companyType}. ${newIncorporationData.reasoning ? 'AI Reasoning: '+newIncorporationData.reasoning.substring(0,100)+'...' : ''}`.trim();
-      
-      const existingItem = orderData.orderItems?.find(item => item.id === 'incorporation_service');
-      if(existingItem){
-         updateOrderItem('incorporation_service', {
-          name: itemName,
-          price: selectedPkg.price,
-          quantity: 1,
-          description: itemDescription
-        });
-      } else {
-         addOrderItem({
-          id: 'incorporation_service',
-          name: itemName,
-          price: selectedPkg.price,
-          quantity: 1,
-          description: itemDescription
-        });
-      }
+      updateOrderData(prev => {
+        const newIncorporationData = {
+            ...prev.incorporation,
+            packageName: selectedPkg.name,
+            price: selectedPkg.price,
+        } as IncorporationDetails;
+        updateIncorporationServiceOrderItem(newIncorporationData);
+        return { incorporation: newIncorporationData };
+      });
     }
   };
 
-  const handleBankingAssistSelect = (selected: boolean, aiReasoning?: string) => {
+  const handleBankingAssistSelect = (selected: boolean, aiReasoningForBanking?: string) => {
     const defaultOption = "Standard Banking Assistance";
     let optionToShow = orderData.bankingAssistance?.option || defaultOption;
     
-    if (selected && aiReasoning && !orderData.bankingAssistance?.option) {
-        optionToShow = aiReasoning;
+    if (selected && aiReasoningForBanking && !orderData.bankingAssistance?.option) {
+        optionToShow = aiReasoningForBanking;
     } else if (!selected) {
         optionToShow = ''; 
     }
@@ -117,7 +126,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       selected: selected,
       price: selected ? 250 : 0, 
       option: optionToShow,
-      reasoning: selected ? (orderData.bankingAssistance?.reasoning || aiReasoning) : undefined,
+      reasoning: selected ? (orderData.bankingAssistance?.reasoning || aiReasoningForBanking) : undefined,
     };
     updateOrderData({ bankingAssistance: newBankingData });
 
@@ -149,20 +158,23 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     }
   };
 
-  const isProceedButtonDisabled = isLoading || !orderData.incorporation?.packageName;
+  const isProceedButtonDisabled = isLoading || !orderData.incorporation?.packageName || !orderData.incorporation?.jurisdiction || !orderData.incorporation?.companyType || (orderData.incorporation.jurisdiction === 'United States of America' && !orderData.incorporation.state);
 
   return (
     <div className="space-y-8">
-      {orderData.incorporation?.reasoning && (
+      {orderData.incorporation?.aiRecommendedReasoning && (
         <Alert variant="default" className="bg-accent/50 border-accent mt-0">
           <Wand2 className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">AI Recommendation Ready</AlertTitle>
+          <AlertTitle className="text-primary">AI Recommendation</AlertTitle>
           <AlertDescription>
-            <p>Based on your input in the previous step, we suggest considering:</p>
-            <p><strong>Jurisdiction:</strong> {orderData.incorporation.jurisdiction}</p>
-            <p><strong>Company Type:</strong> {orderData.incorporation.companyType}</p>
-            <p><strong>Reasoning:</strong> {orderData.incorporation.reasoning}</p>
-            <p className="mt-2 text-sm">You can adjust these below or proceed with these suggestions.</p>
+            <p>Based on your input, our AI suggests considering:</p>
+            <p><strong>Jurisdiction:</strong> {orderData.incorporation.aiRecommendedJurisdiction}</p>
+            {orderData.incorporation.aiRecommendedJurisdiction === 'United States of America' && orderData.incorporation.aiRecommendedState && (
+              <p><strong>State:</strong> {orderData.incorporation.aiRecommendedState.split('-')[0]}</p>
+            )}
+            <p><strong>Company Type:</strong> {orderData.incorporation.aiRecommendedCompanyType}</p>
+            <p><strong>Reasoning:</strong> {orderData.incorporation.aiRecommendedReasoning}</p>
+            <p className="mt-2 text-sm">You can adjust these selections below or proceed with these suggestions.</p>
           </AlertDescription>
         </Alert>
       )}
@@ -170,7 +182,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       <Card>
         <CardHeader>
           <CardTitle>
-            <TypingText text="Select Your Incorporation Package" speed={25} as="span" className="flex items-center" />
+            <TypingText text="Select Your Incorporation Details" speed={25} as="span" className="flex items-center" />
           </CardTitle>
           <CardDescription>Choose your jurisdiction, company type, and desired package.</CardDescription>
         </CardHeader>
@@ -178,23 +190,52 @@ const Step2SelectServices: FC<StepComponentProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <Label htmlFor="jurisdiction">Jurisdiction</Label>
-              <Input 
-                id="jurisdiction" 
-                placeholder="e.g., Delaware, BVI" 
-                value={orderData.incorporation?.jurisdiction || ''} 
-                onChange={e => handleIncorporationFieldChange('jurisdiction', e.target.value)} 
-              />
+              <Select
+                value={orderData.incorporation?.jurisdiction || ''}
+                onValueChange={(value) => handleIncorporationFieldChange('jurisdiction', value)}
+              >
+                <SelectTrigger id="jurisdiction" className="w-full mt-1">
+                  <SelectValue placeholder="Select Jurisdiction" />
+                </SelectTrigger>
+                <SelectContent>
+                  {JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
+            
+            {orderData.incorporation?.jurisdiction === 'United States of America' && (
+              <div>
+                <Label htmlFor="state">State</Label>
+                <Select
+                  value={orderData.incorporation?.state || ''}
+                  onValueChange={(value) => handleIncorporationFieldChange('state', value)}
+                >
+                  <SelectTrigger id="state" className="w-full mt-1">
+                    <SelectValue placeholder="Select State" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="companyType">Company Type</Label>
-              <Input 
-                id="companyType" 
-                placeholder="e.g., LLC, Ltd" 
-                value={orderData.incorporation?.companyType || ''} 
-                onChange={e => handleIncorporationFieldChange('companyType', e.target.value)} 
-              />
+              <Select
+                value={orderData.incorporation?.companyType || ''}
+                onValueChange={(value) => handleIncorporationFieldChange('companyType', value)}
+              >
+                <SelectTrigger id="companyType" className="w-full mt-1">
+                  <SelectValue placeholder="Select Company Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPANY_TYPES_LIST.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
           <div>
             <Label>Incorporation Package</Label>
             <RadioGroup
@@ -238,7 +279,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
               <Switch 
                 id="bankingAssistSwitch" 
                 checked={orderData.bankingAssistance?.selected || false} 
-                onCheckedChange={(checked) => handleBankingAssistSelect(checked, orderData.bankingAssistance?.reasoning || orderData.incorporation?.reasoning)} 
+                onCheckedChange={(checked) => handleBankingAssistSelect(checked, orderData.bankingAssistance?.reasoning)} 
               />
               <Label htmlFor="bankingAssistSwitch">Add Banking Assistance ($250)</Label>
             </div>
@@ -302,4 +343,3 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 };
 
 export default Step2SelectServices;
-

@@ -4,13 +4,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import WizardLayout from '@/components/wizard/WizardLayout';
 import Step1DefineConfigure from '@/components/wizard/steps/Step1DefineConfigure';
-import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices'; // New Import
+import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices';
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
-import type { OrderData, OrderItem } from '@/lib/types'; // Person, ShareholderInfo removed as they are not directly used in initialOrderData here
+import type { OrderData, OrderItem } from '@/lib/types';
 import { STEPS, INITIAL_ADDONS } from '@/lib/types';
-// Removed useToast import as it's not used directly in this file
 
 const initialOrderData: OrderData = {
   userEmail: '',
@@ -24,14 +23,20 @@ const initialOrderData: OrderData = {
   },
   incorporation: {
     jurisdiction: '',
+    state: '',
     companyType: '',
     packageName: '',
     price: 0,
+    aiRecommendedJurisdiction: '',
+    aiRecommendedState: '',
+    aiRecommendedCompanyType: '',
+    aiRecommendedReasoning: '',
   },
   bankingAssistance: {
     selected: false,
     option: '',
     price: 0,
+    reasoning: '',
   },
   addOns: INITIAL_ADDONS.map(addon => ({ ...addon })),
   companyNames: { firstChoice: '', secondChoice: '', thirdChoice: '' },
@@ -44,64 +49,70 @@ const initialOrderData: OrderData = {
   paymentMethod: undefined,
   orderId: '',
   orderStatus: undefined,
-  orderItems: [], // Initialize orderItems
+  orderItems: [],
 };
 
 
 export default function WizardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [orderData, setOrderData] = useState<OrderData>(initialOrderData);
-  // Order items are now part of orderData to be passed around, but also managed locally for UI updates.
-  // This local orderItems state will derive from orderData.orderItems for consistency.
-  const [derivedOrderItems, setDerivedOrderItems] = useState<OrderItem[]>([]); 
+  const [derivedOrderItems, setDerivedOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  // const { toast } = useToast(); // Not used here
 
   const updateOrderDataHandler = useCallback((data: Partial<OrderData> | ((prevData: OrderData) => Partial<OrderData>)) => {
     setOrderData(prev => {
       const newPartialData = typeof data === 'function' ? data(prev) : data;
       const updatedData = { ...prev, ...newPartialData };
       
-      // If addOns are being updated, ensure they are fully part of the new object
       if (newPartialData.addOns) {
         updatedData.addOns = newPartialData.addOns;
+      }
+      if (newPartialData.incorporation) {
+        updatedData.incorporation = { ...prev.incorporation, ...newPartialData.incorporation };
+      }
+      if (newPartialData.bankingAssistance) {
+        updatedData.bankingAssistance = { ...prev.bankingAssistance, ...newPartialData.bankingAssistance };
       }
       
       return updatedData;
     });
   }, []);
   
-  // Derive order items from orderData whenever relevant parts of orderData change
   useEffect(() => {
     const items: OrderItem[] = [];
-    if (orderData.incorporation?.packageName && orderData.incorporation.price && orderData.incorporation.price > 0) {
+    const { incorporation, bankingAssistance, addOns } = orderData;
+
+    if (incorporation?.packageName && incorporation.price && incorporation.price > 0) {
+      const jurisdictionDisplay = incorporation.jurisdiction || incorporation.aiRecommendedJurisdiction || 'Selected Jurisdiction';
+      const stateDisplay = incorporation.jurisdiction === 'United States of America' && incorporation.state ? ` (${incorporation.state.split('-')[0]})` : '';
+      const companyTypeDisplay = incorporation.companyType || incorporation.aiRecommendedCompanyType || 'Company Type';
+      const reasoningDisplay = incorporation.aiRecommendedReasoning ? `AI Suggestion: ${incorporation.aiRecommendedJurisdiction || ''}${incorporation.aiRecommendedState ? ` (${incorporation.aiRecommendedState.split('-')[0]})` : ''} ${incorporation.aiRecommendedCompanyType || ''}. Reasoning: ${incorporation.aiRecommendedReasoning.substring(0,70)}...` : '';
+
+
       items.push({
         id: 'incorporation_service',
-        name: `${orderData.incorporation.jurisdiction || 'Selected'} ${orderData.incorporation.companyType || 'Company'} - ${orderData.incorporation.packageName} Package`,
-        price: orderData.incorporation.price,
+        name: `${jurisdictionDisplay}${stateDisplay} ${companyTypeDisplay} - ${incorporation.packageName} Package`,
+        price: incorporation.price,
         quantity: 1,
-        description: `Includes ${orderData.incorporation.packageName} features. Jurisdiction: ${orderData.incorporation.jurisdiction}, Type: ${orderData.incorporation.companyType}. ${orderData.incorporation.reasoning ? 'AI Reasoning: '+orderData.incorporation.reasoning.substring(0,100)+'...' : ''}`.trim(),
+        description: `Includes ${incorporation.packageName} features. ${reasoningDisplay}`.trim(),
       });
     }
-    if (orderData.bankingAssistance?.selected && orderData.bankingAssistance.price && orderData.bankingAssistance.price > 0) {
+    if (bankingAssistance?.selected && bankingAssistance.price && bankingAssistance.price > 0) {
       items.push({
         id: 'banking_assistance',
         name: 'Banking Assistance',
-        price: orderData.bankingAssistance.price,
+        price: bankingAssistance.price,
         quantity: 1,
-        description: orderData.bankingAssistance.option || `Access to banking partners. ${orderData.bankingAssistance.reasoning ? 'AI Reasoning: '+orderData.bankingAssistance.reasoning.substring(0,100)+'...' : ''}`.trim(),
+        description: bankingAssistance.option || `Access to banking partners. ${bankingAssistance.reasoning ? 'AI Reasoning: '+bankingAssistance.reasoning.substring(0,100)+'...' : ''}`.trim(),
       });
     }
-    orderData.addOns?.forEach(addon => {
-      if (addon.selected && addon.price > 0) { // Ensure price is positive to avoid adding $0 items
+    addOns?.forEach(addon => {
+      if (addon.selected && addon.price > 0) {
         items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.name} service.` });
       }
     });
     
-    setDerivedOrderItems(items); // Update local derived state
-    // Also update orderData.orderItems to keep it in sync for passing to steps
-    // This direct mutation of orderData here might be better handled inside updateOrderDataHandler or a dedicated effect
-    // For now, to ensure consistency, let's update it.
+    setDerivedOrderItems(items);
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
@@ -136,14 +147,13 @@ export default function WizardPage() {
   const removeOrderItemHandler = useCallback((itemId: string) => {
     setOrderData(prevData => {
         const newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
-        // Also update the source in orderData if it's an addon or banking assistance
         let updatedBankingAssistance = prevData.bankingAssistance;
         if (itemId === 'banking_assistance') {
           updatedBankingAssistance = { ...prevData.bankingAssistance, selected: false, price: 0 };
         }
         
         let updatedAddOns = prevData.addOns;
-        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') { // Check if it's an addon
+        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') { 
              updatedAddOns = (prevData.addOns || []).map(addon => 
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );
@@ -178,7 +188,7 @@ export default function WizardPage() {
   const stepProps = {
     orderData,
     updateOrderData: updateOrderDataHandler,
-    orderItems: derivedOrderItems, // Pass derived items for UI
+    orderItems: derivedOrderItems,
     addOrderItem: addOrderItemHandler,
     updateOrderItem: updateOrderItemHandler,
     removeOrderItem: removeOrderItemHandler,
@@ -206,7 +216,7 @@ export default function WizardPage() {
       currentStep={currentStep}
       totalSteps={STEPS.length}
       stepNames={STEPS.map(s => s.name)}
-      orderItems={derivedOrderItems} // Pass derived items to layout
+      orderItems={derivedOrderItems}
     >
       {renderStepContent()}
     </WizardLayout>

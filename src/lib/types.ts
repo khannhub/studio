@@ -8,12 +8,17 @@ export interface OrderItem {
 }
 
 export interface IncorporationDetails {
-  jurisdiction?: string;
-  companyType?: string;
-  packageName?: string; 
+  jurisdiction?: string; // User's current selection
+  state?: string; // User's current selection for US state, format "FullName-Abbreviation"
+  companyType?: string; // User's current selection
+  packageName?: string;
   processingTime?: string;
   price?: number;
-  reasoning?: string; // From AI
+  
+  aiRecommendedJurisdiction?: string; // AI's original recommendation
+  aiRecommendedState?: string; // AI's original recommendation for US state
+  aiRecommendedCompanyType?: string; // AI's original recommendation
+  aiRecommendedReasoning?: string; // AI's original reasoning
 }
 
 export interface BankingAssistance {
@@ -42,7 +47,7 @@ export enum ShareholderType {
 }
 
 export interface Person {
-  id: string; 
+  id: string;
   fullName?: string;
   email?: string;
   phone?: string;
@@ -99,7 +104,7 @@ export interface OrderData {
   // Step 5 Details (was Step 4)
   orderId?: string;
   orderStatus?: "success" | "pending" | "failed";
-  paymentDate?: string; 
+  paymentDate?: string;
   orderItems?: OrderItem[]; // To store items for review and confirmation, might be redundant with derived items in page.tsx but useful for direct passing
 }
 
@@ -131,4 +136,46 @@ export const INITIAL_ADDONS: AddOn[] = [
   { id: 'nominee_shareholder', name: 'Nominee Shareholder', selected: false, price: 400 },
   { id: 'mail_forwarding', name: 'Mail Forwarding & Virtual Office', selected: false, price: 350 },
   { id: 'accounting_services', name: 'Annual Accounting Services', selected: false, price: 750 },
+];
+
+export const JURISDICTIONS_LIST = [
+  'Anguilla', 'Bahamas', 'Belize', 'British Virgin Islands', 'Cayman Islands', 
+  'Cyprus', 'Gibraltar', 'Hong Kong', 'Malaysia', 'Malta', 'Marshall Islands', 
+  'Mauritius', 'Netherlands', 'Panama', 'Saint Lucia', 'Samoa', 'Seychelles', 
+  'Singapore', 'St. Vincent', 'St. Kitts and Nevis', 'Swiss', 'UAE', 
+  'United Kingdom', 'United States of America', 'Vanuatu', 'Vietnam'
+];
+
+export const US_STATES_LIST = [
+  { value: "Alabama-AL", label: "Alabama" }, { value: "Alaska-AK", label: "Alaska" }, 
+  { value: "Arizona-AZ", label: "Arizona" }, { value: "Arkansas-AR", label: "Arkansas" }, 
+  { value: "California-CA", label: "California" }, { value: "Colorado-CO", label: "Colorado" }, 
+  { value: "Connecticut-CT", label: "Connecticut" }, { value: "Delaware-DE", label: "Delaware" }, 
+  { value: "District of Columbia-DC", label: "District of Columbia" }, { value: "Florida-FL", label: "Florida" }, 
+  { value: "Georgia-GA", label: "Georgia" }, { value: "Hawaii-HI", label: "Hawaii" }, 
+  { value: "Idaho-ID", label: "Idaho" }, { value: "Illinois-IL", label: "Illinois" }, 
+  { value: "Indiana-IN", label: "Indiana" }, { value: "Iowa-IA", label: "Iowa" }, 
+  { value: "Kansas-KS", label: "Kansas" }, { value: "Kentucky-KY", label: "Kentucky" }, 
+  { value: "Louisiana-LA", label: "Louisiana" }, { value: "Maine-ME", label: "Maine" }, 
+  { value: "Maryland-MD", label: "Maryland" }, { value: "Massachusetts-MA", label: "Massachusetts" }, 
+  { value: "Michigan-MI", label: "Michigan" }, { value: "Minnesota-MN", label: "Minnesota" }, 
+  { value: "Mississippi-MS", label: "Mississippi" }, { value: "Missouri-MO", label: "Missouri" }, 
+  // { value: "Montana-MT", label: "Montana" }, // Was missing in user's provided list, adhering to user's list
+  { value: "Nebraska-NE", label: "Nebraska" }, { value: "Nevada-NV", label: "Nevada" }, 
+  { value: "New Hampshire-NH", label: "New Hampshire" }, { value: "New Jersey-NJ", label: "New Jersey" }, 
+  { value: "New Mexico-NM", label: "New Mexico" }, { value: "New York-NY", label: "New York" }, 
+  { value: "North Carolina-NC", label: "North Carolina" }, { value: "North Dakota-ND", label: "North Dakota" }, 
+  { value: "Ohio-OH", label: "Ohio" }, { value: "Oklahoma-OK", label: "Oklahoma" }, 
+  { value: "Oregon-OR", label: "Oregon" }, { value: "Pennsylvania-PA", label: "Pennsylvania" }, 
+  { value: "Rhode Island-RI", label: "Rhode Island" }, { value: "South Carolina-SC", label: "South Carolina" }, 
+  { value: "South Dakota-SD", label: "South Dakota" }, { value: "Tennessee-TN", label: "Tennessee" }, 
+  { value: "Texas-TX", label: "Texas" }, { value: "Utah-UT", label: "Utah" }, 
+  { value: "Vermont-VT", label: "Vermont" }, { value: "Virginia-VA", label: "Virginia" }, 
+  { value: "Washington-WA", label: "Washington" }, { value: "West Virginia-WV", label: "West Virginia" }, 
+  { value: "Wisconsin-WI", label: "Wisconsin" }, { value: "Wyoming-WY", label: "Wyoming" }
+];
+
+export const COMPANY_TYPES_LIST = [
+  'Limited Liability Company (LLC)', 'Corporation (Corp./Inc.)', 'Private Limited Company (Ltd.)',
+  'Public Limited Company (PLC)', 'Foundation', 'Trust', 'Partnership', 'Sole Proprietorship', 'International Business Company (IBC)'
 ];
