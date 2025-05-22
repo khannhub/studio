@@ -1,22 +1,17 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import WizardLayout from '@/components/wizard/WizardLayout';
 import Step1DefineConfigure from '@/components/wizard/steps/Step1DefineConfigure';
 import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices';
+import { incorporationPackages as usaPackages, processingTimePackages as intlPackages } from '@/components/wizard/steps/Step2SelectServices';
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
 import type { OrderData, OrderItem, IncorporationRecommendationItem, NeedsAssessment } from '@/lib/types';
 import { STEPS, INITIAL_ADDONS } from '@/lib/types';
-
-// Define incorporationPackages here if it's used in total calculation or summary
-const incorporationPackages = [
-  { name: 'Basic', price: 399, features: ['Company Registration', 'Registered Agent Service (1yr)', 'Standard Documents'] },
-  { name: 'Standard', price: 699, features: ['All Basic Features', 'EIN Application Assistance', 'Corporate Kit'] },
-  { name: 'Premium', price: 999, features: ['All Standard Features', 'Priority Processing', 'Bank Account Opening Support'] },
-];
 
 
 const initialOrderData: OrderData = {
@@ -92,7 +87,7 @@ export default function WizardPage() {
   
   useEffect(() => {
     const items: OrderItem[] = [];
-    const { incorporation, bankingAssistance, addOns } = orderData;
+    const { incorporation, bankingAssistance, addOns, needsAssessment } = orderData;
 
     if (incorporation?.jurisdiction && incorporation.companyType && incorporation.price !== undefined) {
       let name = `${incorporation.jurisdiction}`;
@@ -106,7 +101,10 @@ export default function WizardPage() {
       let description = `Formation in ${incorporation.jurisdiction}.`;
 
       if (incorporation.packageName) {
-        const pkg = incorporationPackages.find(p => p.name === incorporation.packageName);
+        const isUsaFocus = needsAssessment?.region === 'USA (Exclusive Focus)';
+        const activePackages = isUsaFocus ? usaPackages : intlPackages;
+        const pkg = activePackages.find(p => p.name === incorporation.packageName);
+        
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
           totalIncorporationPrice += pkg.price; 
@@ -143,7 +141,7 @@ export default function WizardPage() {
     setDerivedOrderItems(items);
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
-  }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns]);
+  }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns, orderData.needsAssessment?.region]);
 
 
   const addOrderItemHandler = useCallback((item: OrderItem) => {
@@ -250,3 +248,5 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
+
+```

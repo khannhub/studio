@@ -24,7 +24,7 @@ const RecommendIncorporationInputSchema = z.object({
       'A list of key strategic objectives for the incorporation, such as tax optimization, privacy, or ease of management.'
     ),
   region: z.string().describe('The primary region of operation for the business. This could be "USA (Exclusive Focus)" or other international regions.'),
-  businessDescription: z.string().optional().describe('A brief description of the business activities and goals. If "Other" business activities or objectives were selected, details should be provided here.')
+  businessDescription: z.string().optional().describe('A brief description of the business activities and goals. If "Other" business activities or objectives were selected from the card options, details should be provided here.')
 });
 export type RecommendIncorporationInput = z.infer<
   typeof RecommendIncorporationInputSchema
@@ -33,9 +33,9 @@ export type RecommendIncorporationInput = z.infer<
 const SingleRecommendationSchema = z.object({
   jurisdiction: z
     .string()
-    .describe('The recommended jurisdiction for incorporation. MUST be chosen from the provided list.'),
-  state: z.string().optional().describe('The recommended US state, if the jurisdiction is United States of America. This MUST be chosen from the provided list and be in "FullName-Abbreviation" format, e.g., "California-CA". Omit if jurisdiction is not USA.'),
-  companyType: z.string().describe('The recommended company type. If jurisdiction is "United States of America", choose from US-specific list. Otherwise, choose from the international list.'),
+    .describe('The recommended jurisdiction for incorporation. MUST be chosen from the provided list. If primary region is "USA (Exclusive Focus)", this MUST be "United States of America".'),
+  state: z.string().optional().describe('The recommended US state, if the jurisdiction is United States of America. This MUST be chosen from the provided list and be in "FullName-Abbreviation" format, e.g., "California-CA". Omit if jurisdiction is not USA. If primary region is "USA (Exclusive Focus)", a state MUST be recommended.'),
+  companyType: z.string().describe('The recommended company type. If jurisdiction is "United States of America", choose from US-specific list. Otherwise, choose from the international list. If primary region is "USA (Exclusive Focus)", this MUST be from the US list.'),
   shortDescription: z.string().describe('A very brief (10-15 words) tagline or key feature summary for this specific recommendation. E.g., "Popular for US startups, strong legal framework."'),
   reasoning: z
     .string()
@@ -88,28 +88,30 @@ User Inputs:
   {{/each}}
   Region of Operation: {{{region}}}
   {{#if businessDescription}}
-  Business Description (This may contain elaborations if "Other Business Activity" or "Other Strategic Objective" were selected): {{{businessDescription}}}
+  Business Description (This may contain elaborations if "Other Business Activity" or "Other Strategic Objective" were selected from the card options): {{{businessDescription}}}
   {{/if}}
 
 Available Options:
-  Jurisdictions: ${jurisdictionsString}
+  Jurisdictions (for non-USA exclusive focus): ${jurisdictionsString}
   US States (format: FullName-Abbreviation, e.g., "Delaware-DE"): ${usStatesString}
   US Company Types: ${usCompanyTypesString}
   International Company Types: ${intlCompanyTypesString}
 
 Output Structure for EACH recommendation (bestRecommendation and each of the 3 alternatives):
-  -   'jurisdiction': MUST be chosen from the 'Jurisdictions' list.
-  -   'state': (Optional) If 'jurisdiction' is "United States of America", MUST recommend a 'state' from the 'US States' list (e.g., "Delaware-DE"). Otherwise, omit 'state'.
-  -   'companyType': If 'jurisdiction' is "United States of America", MUST be chosen from 'US Company Types'. Otherwise, MUST be chosen from 'International Company Types'.
+  -   'jurisdiction': MUST be chosen from the 'Jurisdictions' list if region is not 'USA (Exclusive Focus)'. If region is 'USA (Exclusive Focus)', 'jurisdiction' MUST be "United States of America".
+  -   'state': (Optional) If 'jurisdiction' is "United States of America", MUST recommend a 'state' from the 'US States' list (e.g., "Delaware-DE"). If region is 'USA (Exclusive Focus)', a state MUST be recommended. Otherwise, omit 'state' unless "United States of America" is chosen as jurisdiction.
+  -   'companyType': If 'jurisdiction' is "United States of America", MUST be chosen from 'US Company Types'. Otherwise, MUST be chosen from 'International Company Types'. If region is 'USA (Exclusive Focus)', companyType MUST be from 'US Company Types'.
   -   'shortDescription': A very brief (10-15 words) tagline or key feature summary for this specific recommendation.
   -   'reasoning': For the 'bestRecommendation', provide comprehensive reasoning (3-4 sentences). For 'alternativeRecommendations', provide concise reasoning (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings.
   -   'price': An estimated base price (integer between 100 and 5000 USD) for this specific incorporation. Example: 1299.
 
 Specific Instructions:
 1.  **Primary Region "USA (Exclusive Focus)"**:
-    *   If the user's 'Region of Operation' is "USA (Exclusive Focus)", then the 'jurisdiction' for the 'bestRecommendation' MUST be "United States of America", and you MUST also recommend a 'state'. The alternatives can be international or other US states.
+    *   If the user's 'Region of Operation' is "USA (Exclusive Focus)":
+        *   The 'jurisdiction' for the 'bestRecommendation' MUST be "United States of America", and you MUST recommend a 'state' from the 'US States' list and a 'companyType' from the 'US Company Types' list.
+        *   ALL THREE 'alternativeRecommendations' MUST also have 'jurisdiction' as "United States of America", recommend a distinct 'state' from the 'US States' list, and a 'companyType' from the 'US Company Types' list. Each of the four recommendations (best + 3 alternatives) must be unique in terms of (state, companyType) combination.
 2.  **Other Primary Regions**:
-    *   If 'Region of Operation' is not "USA (Exclusive Focus)", you can recommend any suitable jurisdiction from the list, including "United States of America" (with a state) if it's a strong strategic fit. The 'bestRecommendation' can be any suitable jurisdiction.
+    *   If 'Region of Operation' is not "USA (Exclusive Focus)", you can recommend any suitable jurisdiction from the 'Jurisdictions' list for all recommendations, including "United States of America" (with a state and US company type) if it's a strong strategic fit. The 'bestRecommendation' can be any suitable jurisdiction.
 3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
 4.  **Pricing**: Provide a realistic base 'price' for each of the four recommendations.
 5.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings.
@@ -130,3 +132,5 @@ const recommendIncorporationFlow = ai.defineFlow(
     return output!;
   }
 );
+
+```

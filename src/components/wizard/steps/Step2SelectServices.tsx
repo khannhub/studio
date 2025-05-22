@@ -3,8 +3,8 @@
 
 import type { FC } from 'react';
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance, IncorporationRecommendationItem } from '@/lib/types';
-import { INITIAL_ADDONS, JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST } from '@/lib/types';
+import type { StepComponentProps, IncorporationRecommendationItem, IncorporationDetails } from '@/lib/types';
+import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, INITIAL_ADDONS } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, Lightbulb, Settings, CheckCircle, Loader2 } from 'lucide-react';
+import { Wand2, ChevronRight, ChevronLeft, Package, Banknote, ShoppingBag, Building, Info, Lightbulb, Settings, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -27,21 +27,27 @@ export const incorporationPackages = [
   { name: 'Premium', price: 999, features: ['All Standard Features', 'Priority Processing', 'Bank Account Opening Support'] },
 ];
 
+export const processingTimePackages = [
+  { name: 'Normal', price: 499, features: ['Standard Processing (5-10 days)', 'Standard Support', 'Standard Document Delivery'] },
+  { name: 'Express', price: 899, features: ['Expedited Processing (3-5 days)', 'Priority Support', 'Digital Docs First'] },
+  { name: 'Super Urgent', price: 1299, features: ['Fastest Processing (1-2 days)', 'Dedicated Support Line', 'Digital & Physical Docs Priority'] },
+];
+
+
 const Step2SelectServices: FC<StepComponentProps> = ({
   orderData,
   updateOrderData,
   goToNextStep,
   goToPrevStep,
-  isLoading: isGlobalLoading, // Renamed to avoid conflict
-  setIsLoading: setGlobalIsLoading, // Renamed
+  isLoading: isGlobalLoading, 
+  setIsLoading: setGlobalIsLoading,
 }) => {
   const { toast } = useToast();
   const [isPrimaryRegionUSA, setIsPrimaryRegionUSA] = useState(false);
   const [currentCompanyTypes, setCurrentCompanyTypes] = useState<string[]>(INTERNATIONAL_COMPANY_TYPES_LIST);
   const [selectedIncorporationKey, setSelectedIncorporationKey] = useState<string | null>(null);
   const [manualConfigAccordionValue, setManualConfigAccordionValue] = useState<string | undefined>(undefined);
-  const [isPrefilling, setIsPrefilling] = useTransition();
-
+  const [isPrefilling, startPrefillingTransition] = useTransition();
 
   const allAiRecommendations = useMemo(() => {
     const recommendations: IncorporationRecommendationItem[] = [];
@@ -54,39 +60,35 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     return recommendations.filter(Boolean);
   }, [orderData.incorporation]);
 
-
   useEffect(() => {
-    const primaryRegionIsUSAEntry = orderData.needsAssessment?.region === 'United States of America';
+    const primaryRegionIsUSAEntry = orderData.needsAssessment?.region === 'USA (Exclusive Focus)';
     setIsPrimaryRegionUSA(primaryRegionIsUSAEntry);
 
     const currentJurisdiction = orderData.incorporation?.jurisdiction;
     const currentState = orderData.incorporation?.state;
     const currentCompanyType = orderData.incorporation?.companyType;
 
-    if (primaryRegionIsUSAEntry) {
-        setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-    } else if (currentJurisdiction === 'United States of America') {
-        setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-    } else {
-        setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+    let activeCompanyTypes = INTERNATIONAL_COMPANY_TYPES_LIST;
+    if (primaryRegionIsUSAEntry || currentJurisdiction === 'United States of America') {
+        activeCompanyTypes = US_COMPANY_TYPES_LIST;
     }
+    setCurrentCompanyTypes(activeCompanyTypes);
     
-    if (currentJurisdiction && currentCompanyType) {
-        const currentSelectionKey = `${currentJurisdiction}-${currentState || 'none'}-${currentCompanyType}`;
-        setSelectedIncorporationKey(currentSelectionKey);
-
+    // Initialize selection key from orderData if available
+    if (currentJurisdiction && currentCompanyType && (primaryRegionIsUSAEntry ? currentState : true)) {
+        const key = `${currentJurisdiction}-${currentState || 'none'}-${currentCompanyType}`;
+        setSelectedIncorporationKey(key);
+        // If there's an AI rec matching current selection, ensure price is from AI.
+        // Otherwise, if custom and price undefined, handle it.
         const matchingAiRec = allAiRecommendations.find(rec =>
-            `${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}` === currentSelectionKey
+            `${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}` === key
         );
-
         if (matchingAiRec && orderData.incorporation?.price !== matchingAiRec.price) {
              updateOrderData(prev => ({
                 incorporation: { ...prev.incorporation, price: matchingAiRec.price }
             }));
         } else if (!matchingAiRec && orderData.incorporation?.price === undefined) {
-             // If it's custom (no matching AI rec) and price is not set, mark as TBD
-            const isUsaJurisdiction = currentJurisdiction === 'United States of America';
-            const allFieldsFilledForCustom = currentJurisdiction && currentCompanyType && (!isUsaJurisdiction || (isUsaJurisdiction && currentState));
+            const allFieldsFilledForCustom = currentJurisdiction && currentCompanyType && (!primaryRegionIsUSAEntry && currentJurisdiction !== 'United States of America' || ( (primaryRegionIsUSAEntry || currentJurisdiction === 'United States of America') && currentState));
             if (allFieldsFilledForCustom) {
                 updateOrderData(prev => ({
                     incorporation: { ...prev.incorporation, price: 0 } 
@@ -94,8 +96,8 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             }
         }
     } else if (orderData.incorporation?.aiBestRecommendation) {
-        const bestRec = orderData.incorporation.aiBestRecommendation;
         // Default to AI best pick if no user selection yet
+        const bestRec = orderData.incorporation.aiBestRecommendation;
         updateOrderData(prev => ({
             incorporation: {
                 ...prev.incorporation,
@@ -106,18 +108,13 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             }
         }));
         setSelectedIncorporationKey(`${bestRec.jurisdiction}-${bestRec.state || 'none'}-${bestRec.companyType}`);
-        if (bestRec.jurisdiction === 'United States of America' || primaryRegionIsUSAEntry) {
-            setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-        } else {
-            setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
-        }
     }
   }, [
     orderData.needsAssessment?.region,
     orderData.incorporation?.jurisdiction,
     orderData.incorporation?.companyType,
     orderData.incorporation?.state,
-    orderData.incorporation?.price, // Added to re-evaluate if price changes externally
+    orderData.incorporation?.price,
     orderData.incorporation?.aiBestRecommendation,
     updateOrderData,
     allAiRecommendations
@@ -134,8 +131,8 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   const handleSelectAiRecommendation = (rec: IncorporationRecommendationItem) => {
     updateOrderData(prev => ({
         incorporation: {
+            // Preserve AI recommendation fields
             ...prev.incorporation,
-            packageName: prev.incorporation?.packageName,
             aiBestRecommendation: prev.incorporation?.aiBestRecommendation,
             aiAlternativeRecommendations: prev.incorporation?.aiAlternativeRecommendations,
             aiRecommendedJurisdiction: prev.incorporation?.aiRecommendedJurisdiction,
@@ -143,18 +140,14 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             aiRecommendedCompanyType: prev.incorporation?.aiRecommendedCompanyType,
             aiRecommendedReasoning: prev.incorporation?.aiRecommendedReasoning,
             
+            // Update user's current selection
             jurisdiction: rec.jurisdiction,
             state: rec.state,
             companyType: rec.companyType,
-            price: rec.price, 
+            price: rec.price,
         }
     }));
     setSelectedIncorporationKey(`${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}`);
-    if (rec.jurisdiction === 'United States of America') {
-        setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
-    } else {
-        setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
-    }
     setManualConfigAccordionValue(undefined); 
   };
 
@@ -162,11 +155,11 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     updateOrderData(prev => {
         let newIncorporation = { ...prev.incorporation } as IncorporationDetails;
         let companyTypeChangedOrCleared = false;
-        let jurisdictionChanged = false;
+        let jurisdictionChangedOrStateChanged = false;
 
         if (field === 'jurisdiction') {
             newIncorporation.jurisdiction = value;
-            jurisdictionChanged = true;
+            jurisdictionChangedOrStateChanged = true;
             if (value === 'United States of America') {
                 setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
                 if (!US_COMPANY_TYPES_LIST.includes(newIncorporation.companyType || '')) {
@@ -181,6 +174,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             }
         } else if (field === 'state') {
             newIncorporation.state = value;
+            jurisdictionChangedOrStateChanged = true;
         } else if (field === 'companyType') {
             newIncorporation.companyType = value;
             companyTypeChangedOrCleared = true;
@@ -200,7 +194,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
             if (allFieldsFilledForCustom) {
                  newIncorporation.price = 0; 
-                 if (companyTypeChangedOrCleared || jurisdictionChanged || field === 'state') {
+                 if (companyTypeChangedOrCleared || jurisdictionChangedOrStateChanged) {
                     toast({ title: "Custom Configuration", description: "The price for this specific combination will be confirmed by our team.", duration: 5000 });
                  }
             } else {
@@ -243,12 +237,12 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
   const handleProceedToDetails = () => {
     setGlobalIsLoading(true);
-    setIsPrefilling(async () => {
+    startPrefillingTransition(async () => {
       try {
         const prefillInput: PrefillCompanyDetailsInput = {
           userEmail: orderData.userEmail || '',
           userPhone: orderData.userPhone || '',
-          businessPurpose: orderData.needsAssessment?.purpose || '',
+          businessPurpose: (orderData.needsAssessment?.businessActivities || []).join(', '),
           businessDescription: orderData.needsAssessment?.businessDescription || '',
           selectedJurisdiction: orderData.incorporation?.jurisdiction || '',
           selectedState: orderData.incorporation?.state || '',
@@ -289,12 +283,13 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     orderData.incorporation.price === undefined ||
     !orderData.incorporation.packageName;
 
-
-  const packageSectionLabel = isPrimaryRegionUSA ? "Select Incorporation Package" : "Select Processing Speed / Package Tier";
-
-  const aiReasoning = orderData.incorporation?.aiRecommendedReasoning;
+  const aiRecommendedReasoning = orderData.incorporation?.aiRecommendedReasoning;
   const bestRec = orderData.incorporation?.aiBestRecommendation;
   const altRecs = orderData.incorporation?.aiAlternativeRecommendations || [];
+
+  const displayedPackages = isPrimaryRegionUSA ? incorporationPackages : processingTimePackages;
+  const packageSectionTitle = isPrimaryRegionUSA ? "Select Incorporation Package" : "Select Processing Time";
+
 
   const renderRecommendationCard = (rec: IncorporationRecommendationItem, isBest: boolean) => {
     const key = `${rec.jurisdiction}-${rec.state || 'none'}-${rec.companyType}`;
@@ -311,9 +306,9 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 isBest ? "md:col-span-3" : "md:col-span-1" 
             )}
         >
-            <CardHeader className={cn("pb-2", isSelected ? "" : "")}>
+            <CardHeader className={cn("pb-2")}>
                 <div className="flex justify-between items-start">
-                    <CardTitle className={cn("text-lg", isBest ? "md:text-xl" : "text-base")}>
+                    <CardTitle className={cn("text-lg leading-tight", isBest ? "md:text-xl" : "text-base")}>
                         {rec.jurisdiction} {stateLabel && `(${stateLabel})`} - {rec.companyType}
                     </CardTitle>
                 </div>
@@ -335,16 +330,17 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-        {aiReasoning && (bestRec || altRecs.length > 0) && (
+        {aiRecommendedReasoning && (bestRec || altRecs.length > 0) && (
             <Alert variant="default" className="bg-primary/5 border-primary/30">
                 <Lightbulb className="h-5 w-5 text-primary" />
                 <AlertTitle className="text-primary font-semibold">Our Recommendation</AlertTitle>
                 <AlertDescription>
-                    <p className="mb-2">Based on your input, we suggest the following for your incorporation. The base price for the chosen jurisdiction and company type is shown on each card. The package price will be added to this.</p>
+                    <p className="mb-2">Based on your input, we suggest the following for your incorporation. The price for the chosen jurisdiction and company type is shown on each card. The package price will be added to this.</p>
                     {bestRec && <p className="text-xs" dangerouslySetInnerHTML={{ __html: `<strong>Top Pick:</strong> ${bestRec.jurisdiction} ${bestRec.state ? '('+bestRec.state.split('-')[0]+')' : ''} - ${bestRec.companyType}. ${bestRec.reasoning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}` }} />}
                 </AlertDescription>
             </Alert>
         )}
+        
         {(bestRec || altRecs.length > 0) && (
             <div className="py-2">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -380,7 +376,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                             )}
 
                             {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
-                                <div className={cn(isPrimaryRegionUSA ? "md:col-span-2" : "")}> {/* State takes full width if primaryRegionUSA, otherwise default */}
+                                <div className={cn(isPrimaryRegionUSA ? "md:col-span-2" : "")}>
                                     <Label htmlFor="state">State</Label>
                                     <Select
                                         value={orderData.incorporation?.state || ''}
@@ -392,13 +388,14 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                                 </div>
                             )}
                             
-                            {/* Company Type always shown, but content depends on jurisdiction */}
                              <div className={cn(isPrimaryRegionUSA && orderData.incorporation?.state ? "md:col-span-2" : "")}>
                                 <Label htmlFor="companyType">Company Type</Label>
                                 <Select
                                     value={orderData.incorporation?.companyType || ''}
                                     onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
-                                    disabled={!orderData.incorporation?.jurisdiction || (orderData.incorporation?.jurisdiction === 'United States of America' && !orderData.incorporation?.state)}
+                                    disabled={
+                                        (!isPrimaryRegionUSA && !orderData.incorporation?.jurisdiction) || 
+                                        ((isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && !orderData.incorporation?.state)}
                                 >
                                     <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
                                     <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
@@ -426,24 +423,24 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         <div className="space-y-3 py-2">
             <div className="flex items-center space-x-2 mb-1">
                 <Package className="h-6 w-6 text-primary" />
-                 <h2 className="text-xl font-semibold">{packageSectionLabel}</h2>
+                 <h2 className="text-xl font-semibold">{packageSectionTitle}</h2>
             </div>
              <RadioGroup
                 value={orderData.incorporation?.packageName || ""}
                 onValueChange={handleIncorporationPackageSelect}
                 className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-            {incorporationPackages.map(pkg => (
+            {displayedPackages.map(pkg => (
                 <Label
                 key={pkg.name}
-                htmlFor={pkg.name}
+                htmlFor={`package-${pkg.name.replace(/\s+/g, '-')}`}
                 className={cn(
                     "flex flex-col items-start cursor-pointer rounded-lg border p-4 transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl",
                     orderData.incorporation?.packageName === pkg.name ? 'border-primary ring-2 ring-primary bg-primary/5 shadow-md' : 'bg-card border-border hover:border-primary/70'
                 )}
                 >
                 <div className="flex items-center w-full">
-                    <RadioGroupItem value={pkg.name} id={pkg.name} className="mr-2"/>
+                    <RadioGroupItem value={pkg.name} id={`package-${pkg.name.replace(/\s+/g, '-')}`} className="mr-2"/>
                     <span className="font-semibold">{pkg.name} - ${pkg.price}</span>
                 </div>
                 <ul className="mt-2 list-disc list-inside text-xs text-muted-foreground space-y-1">
