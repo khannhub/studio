@@ -2,17 +2,16 @@
 'use client';
 
 import type { FC } from 'react';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import type { StepComponentProps, OrderData, IncorporationDetails } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, MailQuestion, HelpCircle, FileText } from 'lucide-react';
-import { recommendIncorporation, RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
+import { recommendIncorporation, type RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import TypingText from '@/components/common/TypingText';
 import { cn } from '@/lib/utils';
@@ -66,9 +65,9 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     }));
   };
 
-  const handleGetRecommendation = () => {
-    if (!orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region) {
-      toast({ title: "Missing Information", description: "Please fill in Purpose, Priorities, and Region to get recommendations.", variant: "destructive" });
+  const handleGetRecommendationAndProceed = () => {
+    if (!isEmailValid || !isPhoneValid || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region || orderData.needsAssessment?.bankingIntent === undefined) {
+      toast({ title: "Missing Information", description: "Please fill in all required fields to get recommendations and proceed.", variant: "destructive" });
       return;
     }
     setIsAiLoading(true);
@@ -89,25 +88,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         };
         setAiRecommendation(recommendationResult);
 
-        updateOrderData({
+        updateOrderData(prev => ({
+          ...prev,
           incorporation: {
-            ...orderData.incorporation,
+            ...prev.incorporation,
             jurisdiction: recommendation.jurisdiction,
             companyType: recommendation.companyType,
             reasoning: recommendation.reasoning,
           },
-          ...(orderData.needsAssessment?.bankingIntent && {
+          ...(prev.needsAssessment?.bankingIntent && {
             bankingAssistance: {
-                ...orderData.bankingAssistance,
+                ...prev.bankingAssistance,
                 selected: true, 
                 reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction} (${recommendation.companyType}).`,
             }
           })
-        });
+        }));
+        
+        // If AI call is successful, proceed to the next step
+        goToNextStep();
 
       } catch (error) {
         console.error("Error getting AI recommendation:", error);
-        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. You can still proceed and select options manually in the next step.", variant: "destructive" });
+        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again. You can still proceed and select options manually in the next step.", variant: "destructive" });
+        // Do NOT proceed to next step if AI fails
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
@@ -160,7 +164,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <div className="space-y-6 py-2"> {/* Replaced Card with div and added padding */}
+      <div className="space-y-6 py-2">
         <div>
           <h2 className="text-xl font-semibold mb-1">
             <TypingText text="Your Contact Information" speed={25} as="span" className="flex items-center" />
@@ -195,7 +199,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         </div>
       </div>
 
-      <div className="space-y-6 py-2"> {/* Replaced Card with div and added padding */}
+      <div className="space-y-6 py-2">
         <div>
           <h2 className="text-xl font-semibold mb-1">
              <TypingText text="Understanding Your Needs" speed={25} as="span" className="flex items-center" />
@@ -246,13 +250,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         </div>
       </div>
 
-      <div className="text-center">
-        <Button onClick={handleGetRecommendation} disabled={isAiLoading || isPending || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region} className="w-full md:w-auto">
-          {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Wand2 className="mr-2 h-4 w-4" /> Get AI Recommendations
-        </Button>
-      </div>
-
       {aiRecommendation && (
         <Alert variant="default" className="bg-accent/50 border-accent">
           <Wand2 className="h-4 w-4 text-primary" />
@@ -262,14 +259,15 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             <p><strong>Jurisdiction:</strong> {aiRecommendation.jurisdiction}</p>
             <p><strong>Company Type:</strong> {aiRecommendation.companyType}</p>
             <p><strong>Reasoning:</strong> {aiRecommendation.reasoning}</p>
-            <p className="mt-2 text-sm">You can select or adjust these in the next step.</p>
+            <p className="mt-2 text-sm">These will be pre-filled for you in the next step.</p>
           </AlertDescription>
         </Alert>
       )}
 
       <div className="flex justify-end items-center mt-8 pt-6 border-t">
-        <Button onClick={goToNextStep} disabled={isProceedButtonDisabled}>
-          Proceed to Select Services <ChevronRight className="ml-2 h-4 w-4" />
+        <Button onClick={handleGetRecommendationAndProceed} disabled={isProceedButtonDisabled} className="w-full md:w-auto">
+          {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Wand2 className="mr-2 h-4 w-4" /> Get Recommendations &amp; Proceed <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -277,5 +275,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
+    
 
     
