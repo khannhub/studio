@@ -52,6 +52,7 @@ const regionOptions = [
   { id: 'other_region', value: 'Other', label: 'Other', icon: <Info className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
+const ANIMATION_DURATION = 400; // Corresponds to Tailwind animation duration (0.4s)
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
   orderData,
@@ -60,24 +61,26 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   updateOrderItem,
   removeOrderItem,
   goToNextStep,
-  isLoading,
-  setIsLoading,
+  isLoading: isGlobalLoading, // Renamed to avoid conflict
+  setIsLoading: setGlobalIsLoading, // Renamed
 }) => {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [currentLogicalQuestion, setCurrentLogicalQuestion] = useState(0);
+  const [displayedQuestionIndex, setDisplayedQuestionIndex] = useState(0);
+  const [animationName, setAnimationName] = useState('animate-slide-in-from-bottom');
+  const [isAnimating, setIsAnimating] = useState(false);
+  
   const [aiRecommendation, setAiRecommendation] = useState<IncorporationDetails & BankingAssistance | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
   const localAddons = orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
 
-
   useEffect(() => {
-    // Sync initial add-ons to orderData if not present
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
   }, [orderData.addOns, updateOrderData]);
-
 
   const handleNeedsAssessmentChange = (field: keyof NonNullable<OrderData['needsAssessment']>, value: string | boolean) => {
     updateOrderData(prev => ({
@@ -93,7 +96,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       toast({ title: "Missing Information", description: "Please fill in Purpose, Priorities, and Region to get recommendations.", variant: "destructive" });
       return;
     }
-    setIsLoading(true);
+    setIsAiLoading(true);
+    setGlobalIsLoading(true);
     startTransition(async () => {
       try {
         const input: RecommendIncorporationInput = {
@@ -108,7 +112,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           reasoning: recommendation.reasoning,
           ...(orderData.needsAssessment?.bankingIntent && { selected: true, option: `Recommended based on AI: ${recommendation.jurisdiction}` })
         });
-        // Pre-fill incorporation details with AI recommendation
         updateOrderData({
           incorporation: {
             ...orderData.incorporation,
@@ -120,7 +123,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             bankingAssistance: {
               selected: true,
               option: `AI Recommended: ${recommendation.jurisdiction} (${recommendation.companyType})`,
-              price: 250, // Example price
+              price: 250, 
               reasoning: recommendation.reasoning,
             }
           })
@@ -129,7 +132,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         console.error("Error getting AI recommendation:", error);
         toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please select manually.", variant: "destructive" });
       } finally {
-        setIsLoading(false);
+        setIsAiLoading(false);
+        setGlobalIsLoading(false);
       }
     });
   };
@@ -156,7 +160,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     const newBankingData = {
       ...orderData.bankingAssistance,
       selected: selected,
-      price: selected ? 250 : 0, // Example price
+      price: selected ? 250 : 0, 
       option: selected ? (orderData.bankingAssistance?.option || 'Standard Banking Assistance') : undefined,
     };
     updateOrderData({ bankingAssistance: newBankingData });
@@ -181,9 +185,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       }
     }
   };
-
-  const nextQuestion = () => setCurrentQuestion(prev => prev + 1);
-  const prevQuestion = () => setCurrentQuestion(prev => prev - 1);
 
   const renderSelectionCards = (
     options: { id: string; value: string; label: string; icon?: JSX.Element }[],
@@ -239,22 +240,18 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         />
       </div>
     </div>,
-    // Question 1: Purpose of business
     <div key="q1">
       <Label className="text-lg font-medium">What is the main purpose of your business?</Label>
       {renderSelectionCards(purposeOptions, orderData.needsAssessment?.purpose, (value) => handleNeedsAssessmentChange('purpose', value), 'purpose')}
     </div>,
-    // Question 2: Priorities
     <div key="q2">
       <Label className="text-lg font-medium">What are your key priorities?</Label>
       {renderSelectionCards(prioritiesOptions, orderData.needsAssessment?.priorities, (value) => handleNeedsAssessmentChange('priorities', value), 'priorities')}
     </div>,
-    // Question 3: Region of operation
     <div key="q3">
       <Label className="text-lg font-medium">What is your primary region of operation?</Label>
       {renderSelectionCards(regionOptions, orderData.needsAssessment?.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
     </div>,
-     // Question 4: Business Description
     <div key="q4">
       <Label htmlFor="businessDescription" className="text-lg font-medium">Briefly describe your business (optional).</Label>
        <Textarea
@@ -265,7 +262,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         className="mt-2 min-h-[100px]"
       />
     </div>,
-    // Question 5: Banking Intent
     <div key="q5" className="space-y-3">
       <Label className="text-lg font-medium">Do you require banking assistance?</Label>
       <RadioGroup
@@ -283,15 +279,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         </div>
       </RadioGroup>
     </div>,
-    // Question 6: AI Recommendation & Core Service Selection
     <div key="q6" className="space-y-6">
-      <Button onClick={handleGetRecommendation} disabled={isLoading || isPending || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region} className="w-full">
-        {(isLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button onClick={handleGetRecommendation} disabled={isAiLoading || isPending || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region} className="w-full">
+        {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         <Wand2 className="mr-2 h-4 w-4" /> Get AI Recommendations &amp; Select Services
       </Button>
-
-      {(isLoading || isPending) && <p className="text-center text-muted-foreground">Fetching recommendations...</p>}
-
+      {(isAiLoading || isPending) && <p className="text-center text-muted-foreground">Fetching recommendations...</p>}
       {aiRecommendation && (
         <Alert variant="default" className="bg-accent/50 border-accent">
           <Wand2 className="h-4 w-4 text-primary" />
@@ -303,8 +296,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Manual Incorporation Selection */}
       <Card>
         <CardHeader>
           <CardTitle>Incorporation Service</CardTitle>
@@ -343,8 +334,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           </div>
         </CardContent>
       </Card>
-      
-      {/* Banking Assistance */}
       {orderData.needsAssessment?.bankingIntent && (
         <Card>
           <CardHeader>
@@ -361,15 +350,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
            )}
         </Card>
       )}
-
-      {/* Add-ons */}
       <Card>
         <CardHeader>
           <CardTitle>Popular Add-ons</CardTitle>
           <CardDescription>Consider these popular services for your new company.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {localAddons.slice(0,3).map(addon => ( // Show first 3 as popular
+          {localAddons.slice(0,3).map(addon => ( 
             <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50">
               <div className="flex items-center">
                 <Switch id={addon.id} checked={addon.selected} onCheckedChange={() => handleAddonToggle(addon.id)} className="mr-3"/>
@@ -395,39 +382,71 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     </div>,
   ];
 
+  const navigateInternal = (newLogicalIndex: number) => {
+    if (isAnimating || newLogicalIndex === currentLogicalQuestion) return;
+
+    setIsAnimating(true);
+    const direction = newLogicalIndex > currentLogicalQuestion ? 'next' : 'prev';
+
+    setAnimationName(direction === 'next' ? 'animate-slide-out-to-top' : 'animate-slide-out-to-bottom');
+
+    setTimeout(() => {
+      setCurrentLogicalQuestion(newLogicalIndex);
+      setDisplayedQuestionIndex(newLogicalIndex);
+      setAnimationName(direction === 'next' ? 'animate-slide-in-from-bottom' : 'animate-slide-in-from-top');
+      
+      // Set isAnimating to false after the "in" animation completes
+      setTimeout(() => {
+        setIsAnimating(false);
+      }, ANIMATION_DURATION);
+    }, ANIMATION_DURATION);
+  };
+
+  const handleNextQuestion = () => {
+    if (currentLogicalQuestion < questions.length - 1) {
+      navigateInternal(currentLogicalQuestion + 1);
+    }
+  };
+
+  const handlePrevQuestion = () => {
+    if (currentLogicalQuestion > 0) {
+      navigateInternal(currentLogicalQuestion - 1);
+    }
+  };
+  
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
-  const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== ''; // Basic check
-  let isNextButtonDisabled = isLoading || isPending;
+  const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== '';
+  let isNextButtonDisabled = isAnimating || isGlobalLoading || isAiLoading || isPending;
 
   if (!isNextButtonDisabled) {
-    switch (currentQuestion) {
-      case 0: // Email & Phone
+    switch (currentLogicalQuestion) {
+      case 0:
         isNextButtonDisabled = !isEmailValid || !isPhoneValid;
         break;
-      case 1: // Purpose
+      case 1:
         isNextButtonDisabled = !orderData.needsAssessment?.purpose;
         break;
-      case 2: // Priorities
+      case 2:
         isNextButtonDisabled = !orderData.needsAssessment?.priorities;
         break;
-      case 3: // Region
+      case 3:
         isNextButtonDisabled = !orderData.needsAssessment?.region;
         break;
-      case 4: // Business Description (Optional)
-        isNextButtonDisabled = false; // Always enabled as it's optional
+      case 4: 
+        isNextButtonDisabled = false; // Optional field
         break;
-      case 5: // Banking Intent
+      case 5:
         isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;
         break;
       default:
-        // For the last step (AI recommendations and service selection),
-        // specific logic is handled by isProceedToDetailsButtonDisabled
         break;
     }
   }
   
   const isProceedToDetailsButtonDisabled =
-    isLoading ||
+    isAnimating ||
+    isGlobalLoading ||
+    isAiLoading ||
     isPending ||
     !orderData.incorporation?.packageName ||
     !orderData.needsAssessment?.purpose ||
@@ -437,20 +456,23 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   return (
     <div className="space-y-8">
       <div className="overflow-hidden">
-        <div key={currentQuestion} className="animate-fade-slide-in-bottom">
+        <div
+          key={displayedQuestionIndex}
+          className={animationName}
+        >
           <div className="p-2">
-            {questions[currentQuestion]}
+            {questions[displayedQuestionIndex]}
           </div>
         </div>
       </div>
 
       <div className="flex justify-between items-center mt-8 pt-6 border-t">
-        <Button variant="outline" onClick={prevQuestion} disabled={currentQuestion === 0 || isLoading || isPending}>
+        <Button variant="outline" onClick={handlePrevQuestion} disabled={isAnimating || currentLogicalQuestion === 0 || isGlobalLoading || isAiLoading || isPending}>
           <ChevronLeft className="mr-2 h-4 w-4" /> Previous
         </Button>
-        {currentQuestion < questions.length - 1 ? (
+        {currentLogicalQuestion < questions.length - 1 ? (
           <Button
-            onClick={nextQuestion}
+            onClick={handleNextQuestion}
             disabled={isNextButtonDisabled}
           >
             Next <ChevronRight className="ml-2 h-4 w-4" />
