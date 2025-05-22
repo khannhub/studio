@@ -10,37 +10,38 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, MailQuestion, HelpCircle, FileText } from 'lucide-react';
+import { Switch } from "@/components/ui/switch"; // Added Switch import
+import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, MailQuestion, HelpCircle, FileText, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout } from 'lucide-react';
 import { recommendIncorporation, type RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import TypingText from '@/components/common/TypingText';
 import { cn } from '@/lib/utils';
 
 const purposeOptions = [
-  { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Online Sales', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'consulting', value: 'Consulting / Professional Services', label: 'Consulting / Services', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Online Sales', icon: <ShoppingCart className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'consulting', value: 'Consulting / Professional Services', label: 'Consulting / Services', icon: <Users className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'holding', value: 'Holding Company / Asset Protection', label: 'Holding / Asset Protection', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'software', value: 'Software / Technology Development', label: 'Tech / Software', icon: <Wand2 className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'software', value: 'Software / Technology Development', label: 'Tech / Software', icon: <Cpu className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'trading', value: 'Trading / Investment', label: 'Trading / Investment', icon: <TrendingUp className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'other_purpose', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const prioritiesOptions = [
   { id: 'tax', value: 'Tax Optimization', label: 'Tax Optimization', icon: <Target className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'privacy', value: 'Privacy & Anonymity', label: 'Privacy & Anonymity', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'privacy', value: 'Privacy & Anonymity', label: 'Privacy & Anonymity', icon: <EyeOff className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Wand2 className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Award className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'other_priority', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const regionOptions = [
   { id: 'global', value: 'Global / No Specific Region', label: 'Global / No Specific', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'north_america', value: 'North America (USA, Canada)', label: 'North America', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'asia', value: 'Asia (Singapore, Hong Kong, etc.)', label: 'Asia', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'mena', value: 'Middle East & Africa', label: 'Middle East & Africa', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'latam', value: 'Latin America & Caribbean', label: 'Latin America', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'north_america', value: 'North America (USA, Canada)', label: 'North America', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'asia', value: 'Asia (Singapore, Hong Kong, etc.)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'mena', value: 'Middle East & Africa', label: 'Middle East & Africa', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'latam', value: 'Latin America & Caribbean', label: 'Latin America', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'other_region', value: 'Other', label: 'Other', icon: <HelpCircle className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
@@ -174,8 +175,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     actionButtonText = 'Proceed to Select Services';
     actionButtonOnClick = goToNextStep;
     isActionButtonDisabled =
-      isGlobalLoading || // Should be false if AI call finished
-      isPending || // Should be false if AI call finished
+      isGlobalLoading || 
+      isPending || 
       !isEmailValid ||
       !isPhoneValid ||
       !orderData.needsAssessment?.purpose ||
@@ -189,8 +190,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     <div className="space-y-8">
       <div className="space-y-6 py-2">
         <div>
-          <h2 className="text-xl font-semibold mb-1">
-            <TypingText text="Your Contact Information" speed={25} as="span" className="flex items-center" />
+          <h2 className="text-xl font-semibold mb-1 flex items-center">
+             Your Contact Information
           </h2>
           <p className="text-sm text-muted-foreground mb-4">Please provide your primary contact details.</p>
         </div>
@@ -224,8 +225,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
       <div className="space-y-6 py-2">
         <div>
-          <h2 className="text-xl font-semibold mb-1">
-             <TypingText text="Understanding Your Needs" speed={25} as="span" className="flex items-center" />
+          <h2 className="text-xl font-semibold mb-1 flex items-center">
+             Understanding Your Needs
           </h2>
           <p className="text-sm text-muted-foreground mb-4">Tell us about your business to help us recommend the best options.</p>
         </div>
@@ -254,21 +255,17 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             />
           </div>
            <div>
-            <Label className="flex items-center text-base font-medium"><Building className="mr-2 h-4 w-4 text-primary"/> Do you require banking assistance?</Label>
-            <RadioGroup
-              value={orderData.needsAssessment?.bankingIntent === undefined ? "" : String(orderData.needsAssessment.bankingIntent)}
-              onValueChange={(value) => handleNeedsAssessmentChange('bankingIntent', value === 'true')}
-              className="flex space-x-4 mt-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="true" id="bankingYes" />
-                <Label htmlFor="bankingYes" className="font-normal">Yes</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="false" id="bankingNo" />
-                <Label htmlFor="bankingNo" className="font-normal">No</Label>
-              </div>
-            </RadioGroup>
+            <Label className="flex items-center text-base font-medium mb-2"><Building className="mr-2 h-4 w-4 text-primary"/> Do you require banking assistance?</Label>
+            <div className="flex items-center space-x-3">
+              <Switch
+                id="bankingIntentSwitch"
+                checked={orderData.needsAssessment?.bankingIntent === true}
+                onCheckedChange={(checked) => handleNeedsAssessmentChange('bankingIntent', checked)}
+              />
+              <Label htmlFor="bankingIntentSwitch" className="font-normal">
+                {orderData.needsAssessment?.bankingIntent ? "Yes, please provide banking assistance options." : "No, I do not require banking assistance at this time."}
+              </Label>
+            </div>
           </div>
         </div>
       </div>
@@ -300,4 +297,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
+    
+
     
