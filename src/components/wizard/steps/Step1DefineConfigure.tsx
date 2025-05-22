@@ -434,7 +434,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <div className="min-h-[250px] p-2 transition-all duration-300 ease-in-out">
+      <div className="p-2 transition-all duration-300 ease-in-out">
          {questions[currentQuestion]}
       </div>
 
