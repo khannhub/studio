@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -12,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const initialOrderData: OrderData = {
   userEmail: '',
+  userPhone: '',
   needsAssessment: {
     purpose: '',
     priorities: '',

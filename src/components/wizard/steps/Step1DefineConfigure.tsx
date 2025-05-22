@@ -212,17 +212,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   );
 
   const questions = [
-    // Question 0: Email
-    <div key="q0">
-      <Label htmlFor="email" className="text-lg font-medium">Let's get started. What's your email?</Label>
-      <Input
-        id="email"
-        type="email"
-        placeholder="you@example.com"
-        value={orderData.userEmail || ''}
-        onChange={(e) => updateOrderData({ userEmail: e.target.value })}
-        className="mt-2"
-      />
+    // Question 0: Email & Phone
+    <div key="q0" className="space-y-4">
+      <div>
+        <Label htmlFor="email" className="text-lg font-medium">Let's get started. What's your email?</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          value={orderData.userEmail || ''}
+          onChange={(e) => updateOrderData({ userEmail: e.target.value })}
+          className="mt-2"
+        />
+      </div>
+      <div>
+        <Label htmlFor="phone" className="text-lg font-medium">What's your phone number? (Optional)</Label>
+        <Input
+          id="phone"
+          type="tel"
+          placeholder="+1 (555) 123-4567"
+          value={orderData.userPhone || ''}
+          onChange={(e) => updateOrderData({ userPhone: e.target.value })}
+          className="mt-2"
+        />
+      </div>
     </div>,
     // Question 1: Purpose of business
     <div key="q1">
@@ -381,13 +394,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   ];
 
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
-
   let isNextButtonDisabled = isLoading || isPending;
 
-  if (!isNextButtonDisabled) { // Only check further conditions if not already disabled by loading state
+  if (!isNextButtonDisabled) {
     switch (currentQuestion) {
-      case 0: // Email
-        isNextButtonDisabled = !isEmailValid;
+      case 0: // Email & Phone
+        isNextButtonDisabled = !isEmailValid; // Phone is optional
         break;
       case 1: // Purpose
         isNextButtonDisabled = !orderData.needsAssessment?.purpose;
@@ -405,10 +417,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;
         break;
       default:
-        // For any question index not explicitly handled by this switch (e.g. currentQuestion === 6, the final service selection screen),
-        // isNextButtonDisabled will retain its value from (isLoading || isPending).
-        // The "Next" button itself won't be visible on the last screen (question 6), 
-        // as "Proceed to Details" button is shown instead.
         break;
     }
   }
@@ -449,4 +457,3 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
-

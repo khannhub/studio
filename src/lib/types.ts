@@ -1,3 +1,4 @@
+
 export interface OrderItem {
   id: string;
   name: string;
@@ -65,6 +66,7 @@ export interface Address {
 
 export interface OrderData {
   userEmail?: string; // Step 1: Initial email
+  userPhone?: string; // Step 1: Initial phone
   needsAssessment?: {
     purpose?: string;
     priorities?: string;
