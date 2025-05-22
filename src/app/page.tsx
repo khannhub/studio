@@ -5,8 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import WizardLayout from '@/components/wizard/WizardLayout';
 import Step1DefineConfigure from '@/components/wizard/steps/Step1DefineConfigure';
-import Step2SelectServices from '@/components/wizard/steps/Step2SelectServices';
-import { incorporationPackages as usaPackages, processingTimePackages as intlPackages } from '@/components/wizard/steps/Step2SelectServices';
+import Step2SelectServices, { incorporationPackages as usaPackages, processingTimePackages as intlPackages } from '@/components/wizard/steps/Step2SelectServices';
 import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
@@ -27,10 +26,12 @@ const initialOrderData: OrderData = {
     jurisdiction: '',
     state: '',
     companyType: '',
-    price: 0, 
+    price: 0,
     packageName: '',
+
     aiBestRecommendation: null,
     aiAlternativeRecommendations: [],
+
     aiRecommendedJurisdiction: '',
     aiRecommendedState: '',
     aiRecommendedCompanyType: '',
@@ -67,7 +68,7 @@ export default function WizardPage() {
     setOrderData(prev => {
       const newPartialData = typeof data === 'function' ? data(prev) : data;
       const updatedData = { ...prev, ...newPartialData };
-      
+
       if (newPartialData.addOns) {
         updatedData.addOns = newPartialData.addOns;
       }
@@ -80,11 +81,30 @@ export default function WizardPage() {
       if (newPartialData.needsAssessment) {
         updatedData.needsAssessment = { ...prev.needsAssessment, ...newPartialData.needsAssessment };
       }
-      
+      if (newPartialData.companyNames) {
+        updatedData.companyNames = { ...prev.companyNames, ...newPartialData.companyNames };
+      }
+      if (newPartialData.directors) {
+        updatedData.directors = newPartialData.directors;
+      }
+       if (newPartialData.shareholders) {
+        updatedData.shareholders = newPartialData.shareholders;
+      }
+      if (newPartialData.primaryContact) {
+        updatedData.primaryContact = { ...prev.primaryContact, ...newPartialData.primaryContact };
+      }
+       if (newPartialData.deliveryAddress) {
+        updatedData.deliveryAddress = { ...prev.deliveryAddress, ...newPartialData.deliveryAddress };
+      }
+      if (newPartialData.billingAddress) {
+        updatedData.billingAddress = { ...prev.billingAddress, ...newPartialData.billingAddress };
+      }
+
+
       return updatedData;
     });
   }, []);
-  
+
   useEffect(() => {
     const items: OrderItem[] = [];
     const { incorporation, bankingAssistance, addOns, needsAssessment } = orderData;
@@ -97,21 +117,21 @@ export default function WizardPage() {
       }
       name += ` ${incorporation.companyType}`;
 
-      let totalIncorporationPrice = incorporation.price || 0; 
+      let totalIncorporationPrice = incorporation.price || 0;
       let description = `Formation in ${incorporation.jurisdiction}.`;
 
       if (incorporation.packageName) {
         const isUsaFocus = needsAssessment?.region === 'USA (Exclusive Focus)';
         const activePackages = isUsaFocus ? usaPackages : intlPackages;
         const pkg = activePackages.find(p => p.name === incorporation.packageName);
-        
+
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationPrice += pkg.price; 
-          description += ` Includes ${incorporation.packageName} features.`;
+          totalIncorporationPrice += pkg.price;
+          description += ` Includes ${incorporation.packageName} features. Recommended for your needs.`;
         }
       }
-      
+
       if (totalIncorporationPrice > 0 || (incorporation.price === 0 && incorporation.packageName) ) {
          items.push({
             id: 'incorporation_service',
@@ -137,7 +157,7 @@ export default function WizardPage() {
         items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.name} service.` });
       }
     });
-    
+
     setDerivedOrderItems(items);
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
@@ -150,7 +170,7 @@ export default function WizardPage() {
         const existingItemIndex = existingItems.findIndex(i => i.id === item.id);
         let newItems;
         if (existingItemIndex > -1) {
-            newItems = existingItems.map((i, idx) => 
+            newItems = existingItems.map((i, idx) =>
                 idx === existingItemIndex ? { ...i, quantity: i.quantity + item.quantity, price: item.price, name: item.name, description: item.description } : i
             );
         } else {
@@ -162,7 +182,7 @@ export default function WizardPage() {
 
   const updateOrderItemHandler = useCallback((itemId: string, updates: Partial<OrderItem>) => {
      setOrderData(prevData => {
-        const newItems = (prevData.orderItems || []).map(item => 
+        const newItems = (prevData.orderItems || []).map(item =>
             item.id === itemId ? {...item, ...updates} : item
         );
         return { ...prevData, orderItems: newItems };
@@ -177,10 +197,10 @@ export default function WizardPage() {
         if (itemId === 'banking_assistance') {
           updatedBankingAssistance = { ...prevData.bankingAssistance, selected: false, price: 0 };
         }
-        
+
         let updatedAddOns = prevData.addOns;
-        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') { 
-             updatedAddOns = (prevData.addOns || []).map(addon => 
+        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') {
+             updatedAddOns = (prevData.addOns || []).map(addon =>
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );
         }
@@ -202,7 +222,7 @@ export default function WizardPage() {
       window.scrollTo(0, 0);
     }
   }, [currentStep]);
-  
+
   const goToStep = useCallback((step: number) => {
     if (step >= 1 && step <= STEPS.length) {
       setCurrentStep(step);
@@ -214,7 +234,7 @@ export default function WizardPage() {
   const stepProps = {
     orderData,
     updateOrderData: updateOrderDataHandler,
-    orderItems: derivedOrderItems, 
+    orderItems: derivedOrderItems,
     addOrderItem: addOrderItemHandler,
     updateOrderItem: updateOrderItemHandler,
     removeOrderItem: removeOrderItemHandler,
@@ -248,5 +268,3 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
-
-```

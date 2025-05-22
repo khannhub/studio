@@ -65,7 +65,7 @@ export async function recommendIncorporation(
 }
 
 const jurisdictionsString = JURISDICTIONS_LIST.join(', ');
-const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; '); 
+const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; ');
 const usCompanyTypesString = US_COMPANY_TYPES_LIST.join(', ');
 const intlCompanyTypesString = INTERNATIONAL_COMPANY_TYPES_LIST.join(', ');
 
@@ -132,5 +132,3 @@ const recommendIncorporationFlow = ai.defineFlow(
     return output!;
   }
 );
-
-```
