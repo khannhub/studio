@@ -7,7 +7,6 @@ import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, Bankin
 import { INITIAL_ADDONS } from '@/lib/types'; // Ensure INITIAL_ADDONS is imported
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import AnimatedPlaceholderInput from '@/components/common/AnimatedPlaceholderInput'; // IMPORT
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -241,10 +240,10 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     <div key="q0" className="space-y-4">
       <div>
         <TypingText text="Let's get started. What's your email?" speed={30} className="text-lg font-medium block mb-1" as="label" />
-        <AnimatedPlaceholderInput
+        <Input
           id="email"
           type="email"
-          animatedPlaceholder="you@example.com"
+          placeholder="you@example.com"
           value={orderData.userEmail || ''}
           onChange={(e) => updateOrderData({ userEmail: e.target.value })}
           className="mt-1"
@@ -253,7 +252,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       </div>
       <div>
         <TypingText text="And your phone number?" speed={30} className="text-lg font-medium block mb-1" as="label" />
-        <Input // Standard input for phone for now, or also make AnimatedPlaceholderInput
+        <Input
           id="phone"
           type="tel"
           placeholder="+1 (555) 123-4567"
