@@ -89,20 +89,18 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         };
         setAiRecommendation(recommendationResult);
 
-        // Store AI recommendation in orderData for Step 2 to use
         updateOrderData({
           incorporation: {
-            ...orderData.incorporation, // Keep any existing package info if user goes back and forth
+            ...orderData.incorporation,
             jurisdiction: recommendation.jurisdiction,
             companyType: recommendation.companyType,
             reasoning: recommendation.reasoning,
           },
-          // Banking assistance preference is already captured, AI might inform options in Step 2
           ...(orderData.needsAssessment?.bankingIntent && {
             bankingAssistance: {
                 ...orderData.bankingAssistance,
-                selected: true, // Default to selected if intent is yes
-                reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction} (${recommendation.companyType}).`, // Updated reasoning
+                selected: true, 
+                reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction} (${recommendation.companyType}).`,
             }
           })
         });
@@ -162,14 +160,14 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>
+      <div className="space-y-6 py-2"> {/* Replaced Card with div and added padding */}
+        <div>
+          <h2 className="text-xl font-semibold mb-1">
             <TypingText text="Your Contact Information" speed={25} as="span" className="flex items-center" />
-          </CardTitle>
-          <CardDescription>Please provide your primary contact details.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">Please provide your primary contact details.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div>
             <Label htmlFor="email" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary"/> Email</Label>
             <Input
@@ -194,31 +192,32 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
               required
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
+      <div className="space-y-6 py-2"> {/* Replaced Card with div and added padding */}
+        <div>
+          <h2 className="text-xl font-semibold mb-1">
              <TypingText text="Understanding Your Needs" speed={25} as="span" className="flex items-center" />
-          </CardTitle>
-          <CardDescription>Tell us about your business to help us recommend the best options.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">Tell us about your business to help us recommend the best options.</p>
+        </div>
+        
+        <div className="space-y-6">
           <div>
-            <Label className="flex items-center"><MailQuestion className="mr-2 h-4 w-4 text-primary"/> What is the main purpose of your business?</Label>
+            <Label className="flex items-center text-base font-medium"><MailQuestion className="mr-2 h-4 w-4 text-primary"/> What is the main purpose of your business?</Label>
             {renderSelectionCards(purposeOptions, orderData.needsAssessment?.purpose, (value) => handleNeedsAssessmentChange('purpose', value), 'purpose')}
           </div>
           <div>
-            <Label className="flex items-center"><Target className="mr-2 h-4 w-4 text-primary"/> What are your key priorities?</Label>
+            <Label className="flex items-center text-base font-medium"><Target className="mr-2 h-4 w-4 text-primary"/> What are your key priorities?</Label>
             {renderSelectionCards(prioritiesOptions, orderData.needsAssessment?.priorities, (value) => handleNeedsAssessmentChange('priorities', value), 'priorities')}
           </div>
           <div>
-            <Label className="flex items-center"><Globe className="mr-2 h-4 w-4 text-primary"/> What is your primary region of operation?</Label>
+            <Label className="flex items-center text-base font-medium"><Globe className="mr-2 h-4 w-4 text-primary"/> What is your primary region of operation?</Label>
             {renderSelectionCards(regionOptions, orderData.needsAssessment?.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
           </div>
           <div>
-            <Label htmlFor="businessDescription" className="flex items-center"><FileText className="mr-2 h-4 w-4 text-primary"/> Briefly describe your business (optional).</Label>
+            <Label htmlFor="businessDescription" className="flex items-center text-base font-medium"><FileText className="mr-2 h-4 w-4 text-primary"/> Briefly describe your business (optional).</Label>
             <Textarea
               id="businessDescription"
               placeholder="Provide a short summary of your business activities and goals."
@@ -228,7 +227,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             />
           </div>
            <div>
-            <Label className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary"/> Do you require banking assistance?</Label>
+            <Label className="flex items-center text-base font-medium"><Building className="mr-2 h-4 w-4 text-primary"/> Do you require banking assistance?</Label>
             <RadioGroup
               value={orderData.needsAssessment?.bankingIntent === undefined ? "" : String(orderData.needsAssessment.bankingIntent)}
               onValueChange={(value) => handleNeedsAssessmentChange('bankingIntent', value === 'true')}
@@ -236,16 +235,16 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="true" id="bankingYes" />
-                <Label htmlFor="bankingYes">Yes</Label>
+                <Label htmlFor="bankingYes" className="font-normal">Yes</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="false" id="bankingNo" />
-                <Label htmlFor="bankingNo">No</Label>
+                <Label htmlFor="bankingNo" className="font-normal">No</Label>
               </div>
             </RadioGroup>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <div className="text-center">
         <Button onClick={handleGetRecommendation} disabled={isAiLoading || isPending || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region} className="w-full md:w-auto">
@@ -278,3 +277,5 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
+
+    
