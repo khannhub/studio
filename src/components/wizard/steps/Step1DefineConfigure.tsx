@@ -2,7 +2,7 @@
 'use client';
 
 import type { FC } from 'react';
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useRef } from 'react';
 import type { StepComponentProps, OrderData, IncorporationDetails } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,31 +17,31 @@ import { cn } from '@/lib/utils';
 import TypingText from '@/components/common/TypingText';
 
 const purposeOptions = [
-  { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Online Sales', icon: <ShoppingCart className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'ecommerce', value: 'E-commerce / Online Sales', label: 'E-commerce / Sales', icon: <ShoppingCart className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'consulting', value: 'Consulting / Professional Services', label: 'Consulting / Services', icon: <Users className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'holding', value: 'Holding Company / Asset Protection', label: 'Holding / Asset Protection', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'holding', value: 'Holding Company / Asset Protection', label: 'Holding / Assets', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'software', value: 'Software / Technology Development', label: 'Tech / Software', icon: <Cpu className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'trading', value: 'Trading / Investment', label: 'Trading / Investment', icon: <TrendingUp className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_purpose', value: 'Other', label: 'Other', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'other_purpose', value: 'Other', label: 'Other Purpose', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const prioritiesOptions = [
   { id: 'tax', value: 'Tax Optimization', label: 'Tax Optimization', icon: <Target className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'privacy', value: 'Privacy & Anonymity', label: 'Privacy & Anonymity', icon: <EyeOff className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
   { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Award className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_priority', value: 'Other', label: 'Other', icon: <MailQuestion className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'other_priority', value: 'Other', label: 'Other Priority', icon: <MailQuestion className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const regionOptions = [
-  { id: 'global', value: 'Global / No Specific Region', label: 'Global / No Specific', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'north_america', value: 'North America (USA, Canada)', label: 'North America', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'global', value: 'Global / No Specific Region', label: 'Global / Non-Specific', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'north_america', value: 'North America (USA, Canada)', label: 'North America', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
   { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'asia', value: 'Asia (Singapore, Hong Kong, etc.)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'mena', value: 'Middle East & Africa', label: 'Middle East & Africa', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'latam', value: 'Latin America & Caribbean', label: 'Latin America', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_region', value: 'Other', label: 'Other', icon: <FileText className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'mena', value: 'Middle East & Africa', label: 'MENA', icon: <Building className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'latam', value: 'Latin America & Caribbean', label: 'LATAM & Caribbean', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_region', value: 'Other', label: 'Other Region', icon: <FileText className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
@@ -53,6 +53,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [lastSuccessfulAiCallInputs, setLastSuccessfulAiCallInputs] = useState<RecommendIncorporationInput | null>(null);
+
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -79,6 +80,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
     // Check if inputs have changed since last successful AI call OR if no recommendation exists yet
     const inputsHaveChanged = !lastSuccessfulAiCallInputs ||
+      !orderData.incorporation?.aiRecommendedReasoning || // Ensure reasoning exists
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
@@ -111,23 +113,23 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           ...(prev.needsAssessment?.bankingIntent && {
             bankingAssistance: {
                 ...prev.bankingAssistance,
-                reasoning: `AI suggests considering banking options suitable for ${recommendation.jurisdiction}${recommendation.state ? ` (${recommendation.state.split('-')[0]})` : ''} (${recommendation.companyType}).`,
+                reasoning: `We suggest considering banking options suitable for ${recommendation.jurisdiction}${recommendation.state ? ` (${recommendation.state.split('-')[0]})` : ''} (${recommendation.companyType}).`,
             }
           })
         }));
         setLastSuccessfulAiCallInputs(currentAiInputs); // Store successful inputs
-        // toast({ title: "AI Recommendations Ready", description: "Proceeding to service selection.", variant: "default" }); // No toast here, directly go next
         goToNextStep();
 
       } catch (error) {
-        console.error("Error getting AI recommendation:", error);
-        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again.", variant: "destructive" });
+        console.error("Error getting recommendation:", error);
+        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations at this time. Please try again.", variant: "destructive" });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
       }
     });
   };
+
 
   const renderSelectionCards = (
     options: { id: string; value: string; label: string; icon?: JSX.Element }[],

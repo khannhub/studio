@@ -2,17 +2,16 @@
 'use client';
 
 import type { FC } from 'react';
-import { useEffect, useMemo } from 'react';
-import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance, OrderItem } from '@/lib/types';
-import { INITIAL_ADDONS, JURISDICTIONS_LIST, US_STATES_LIST, COMPANY_TYPES_LIST } from '@/lib/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, BankingAssistance } from '@/lib/types';
+import { INITIAL_ADDONS, JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wand2, ChevronRight, ChevronLeft, Info, Building } from 'lucide-react';
+import { Wand2, ChevronRight, ChevronLeft, Info, Building, ShoppingBag, HelpCircle, Package, Banknote } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import TypingText from '@/components/common/TypingText';
 import { cn } from '@/lib/utils';
@@ -38,30 +37,37 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     return orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
   }, [orderData.addOns]);
 
+  const [currentCompanyTypes, setCurrentCompanyTypes] = useState<string[]>(INTERNATIONAL_COMPANY_TYPES_LIST);
+
+  useEffect(() => {
+    if (orderData.incorporation?.jurisdiction === 'United States of America') {
+      setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
+    } else {
+      setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+    }
+  }, [orderData.incorporation?.jurisdiction]);
+
+
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
     if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.aiRecommendedReasoning && !orderData.bankingAssistance?.selected) {
-        if (orderData.bankingAssistance?.reasoning) { // AI reasoning for banking
+        if (orderData.bankingAssistance?.reasoning) { 
             handleBankingAssistSelect(true, orderData.bankingAssistance.reasoning);
         }
     }
   }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.aiRecommendedReasoning, orderData.bankingAssistance]);
 
   const updateIncorporationServiceOrderItem = (updatedIncorporationData: IncorporationDetails) => {
-    const { packageName, price, jurisdiction, state, companyType, aiRecommendedReasoning } = updatedIncorporationData;
-    if (packageName && price && price > 0) {
-      const jurisdictionDisplay = jurisdiction || 'Selected Jurisdiction';
+    const { packageName, price, jurisdiction, state, companyType } = updatedIncorporationData;
+    if (packageName && price && price > 0 && jurisdiction && companyType) {
+      const jurisdictionDisplay = jurisdiction;
       const stateDisplay = jurisdiction === 'United States of America' && state ? ` (${state.split('-')[0]})` : '';
-      const companyTypeDisplay = companyType || 'Company Type';
+      const companyTypeDisplay = companyType;
       
-      const aiReasoningText = aiRecommendedReasoning 
-          ? `Original AI Suggestion: ${updatedIncorporationData.aiRecommendedJurisdiction || ''}${updatedIncorporationData.aiRecommendedState ? ` (${updatedIncorporationData.aiRecommendedState.split('-')[0]})` : ''} ${updatedIncorporationData.aiRecommendedCompanyType || ''}. Reasoning: ${aiRecommendedReasoning.substring(0,70)}...` 
-          : '';
-
       const itemName = `${jurisdictionDisplay}${stateDisplay} ${companyTypeDisplay} - ${packageName} Package`;
-      const itemDescription = `Includes ${packageName} features. ${aiReasoningText}`.trim();
+      const itemDescription = `Includes ${packageName} features. Recommended for your needs.`;
 
       const existingItem = orderData.orderItems?.find(item => item.id === 'incorporation_service');
       const itemPayload = {
@@ -86,12 +92,24 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       const newIncorporationData = {
         ...prev.incorporation,
         [field]: value,
-      };
+      } as IncorporationDetails;
+
       // Clear state if jurisdiction is not USA
       if (field === 'jurisdiction' && value !== 'United States of America') {
         newIncorporationData.state = '';
       }
-      updateIncorporationServiceOrderItem(newIncorporationData as IncorporationDetails);
+      
+      // Update company type list and potentially clear company type if invalid
+      if (field === 'jurisdiction') {
+        const newCompanyTypesList = value === 'United States of America' 
+          ? US_COMPANY_TYPES_LIST 
+          : INTERNATIONAL_COMPANY_TYPES_LIST;
+        if (newIncorporationData.companyType && !newCompanyTypesList.includes(newIncorporationData.companyType)) {
+          newIncorporationData.companyType = ''; // Clear if no longer valid
+        }
+      }
+
+      updateIncorporationServiceOrderItem(newIncorporationData);
       return { incorporation: newIncorporationData };
     });
   };
@@ -111,12 +129,12 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     }
   };
 
-  const handleBankingAssistSelect = (selected: boolean, aiReasoningForBanking?: string) => {
+  const handleBankingAssistSelect = (selected: boolean, suggestedReasoning?: string) => {
     const defaultOption = "Standard Banking Assistance";
     let optionToShow = orderData.bankingAssistance?.option || defaultOption;
     
-    if (selected && aiReasoningForBanking && !orderData.bankingAssistance?.option) {
-        optionToShow = aiReasoningForBanking;
+    if (selected && suggestedReasoning && !orderData.bankingAssistance?.option) { // Use suggested if available and no option set
+        optionToShow = suggestedReasoning;
     } else if (!selected) {
         optionToShow = ''; 
     }
@@ -126,7 +144,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       selected: selected,
       price: selected ? 250 : 0, 
       option: optionToShow,
-      reasoning: selected ? (orderData.bankingAssistance?.reasoning || aiReasoningForBanking) : undefined,
+      reasoning: selected ? (orderData.bankingAssistance?.reasoning || suggestedReasoning) : undefined,
     };
     updateOrderData({ bankingAssistance: newBankingData });
 
@@ -151,7 +169,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     const toggledAddon = updatedAddons.find(a => a.id === addonId);
     if (toggledAddon) {
       if (toggledAddon.selected) {
-        addOrderItem({ id: toggledAddon.id, name: toggledAddon.name, price: toggledAddon.price, quantity: 1 });
+        addOrderItem({ id: toggledAddon.id, name: toggledAddon.name, price: toggledAddon.price, quantity: 1, description: `${toggledAddon.name} service.` });
       } else {
         removeOrderItem(toggledAddon.id);
       }
@@ -165,61 +183,63 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       {orderData.incorporation?.aiRecommendedReasoning && (
         <Alert variant="default" className="bg-accent/50 border-accent mt-0">
           <Wand2 className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">AI Recommendation</AlertTitle>
+          <AlertTitle className="text-primary">Our Recommendation</AlertTitle>
           <AlertDescription>
-            <p>Based on your input, our AI suggests considering:</p>
+            <p>Based on your input, we suggest considering:</p>
             <p><strong>Jurisdiction:</strong> {orderData.incorporation.aiRecommendedJurisdiction}</p>
             {orderData.incorporation.aiRecommendedJurisdiction === 'United States of America' && orderData.incorporation.aiRecommendedState && (
               <p><strong>State:</strong> {orderData.incorporation.aiRecommendedState.split('-')[0]}</p>
             )}
             <p><strong>Company Type:</strong> {orderData.incorporation.aiRecommendedCompanyType}</p>
-            <p><strong>Reasoning:</strong> {orderData.incorporation.aiRecommendedReasoning}</p>
+            <p dangerouslySetInnerHTML={{ __html: `<strong>Reasoning:</strong> ${orderData.incorporation.aiRecommendedReasoning.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}` }} />
             <p className="mt-2 text-sm">You can adjust these selections below or proceed with these suggestions.</p>
           </AlertDescription>
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <TypingText text="Select Your Incorporation Details" speed={25} as="span" className="flex items-center" />
-          </CardTitle>
-          <CardDescription>Choose your jurisdiction, company type, and desired package.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <Label htmlFor="jurisdiction">Jurisdiction</Label>
-              <Select
-                value={orderData.incorporation?.jurisdiction || ''}
-                onValueChange={(value) => handleIncorporationFieldChange('jurisdiction', value)}
-              >
-                <SelectTrigger id="jurisdiction" className="w-full mt-1">
-                  <SelectValue placeholder="Select Jurisdiction" />
-                </SelectTrigger>
-                <SelectContent>
-                  {JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {orderData.incorporation?.jurisdiction === 'United States of America' && (
+      <div className="space-y-6 py-2">
+          <h2 className="text-xl font-semibold flex items-center">
+            <Package className="mr-2 h-5 w-5 text-primary"/>
+            <TypingText text="Select Your Incorporation Details" speed={25} as="span" />
+          </h2>
+          <p className="text-sm text-muted-foreground">Choose your jurisdiction, company type, and desired package.</p>
+        
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+            {/* Column 1: Jurisdiction and State */}
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="state">State</Label>
+                <Label htmlFor="jurisdiction">Jurisdiction</Label>
                 <Select
-                  value={orderData.incorporation?.state || ''}
-                  onValueChange={(value) => handleIncorporationFieldChange('state', value)}
+                  value={orderData.incorporation?.jurisdiction || ''}
+                  onValueChange={(value) => handleIncorporationFieldChange('jurisdiction', value)}
                 >
-                  <SelectTrigger id="state" className="w-full mt-1">
-                    <SelectValue placeholder="Select State" />
+                  <SelectTrigger id="jurisdiction" className="w-full mt-1">
+                    <SelectValue placeholder="Select Jurisdiction" />
                   </SelectTrigger>
                   <SelectContent>
-                    {US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    {JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-
+              
+              {orderData.incorporation?.jurisdiction === 'United States of America' && (
+                <div>
+                  <Label htmlFor="state">State</Label>
+                  <Select
+                    value={orderData.incorporation?.state || ''}
+                    onValueChange={(value) => handleIncorporationFieldChange('state', value)}
+                  >
+                    <SelectTrigger id="state" className="w-full mt-1">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            {/* Column 2: Company Type */}
             <div>
               <Label htmlFor="companyType">Company Type</Label>
               <Select
@@ -230,7 +250,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                   <SelectValue placeholder="Select Company Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMPANY_TYPES_LIST.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}
+                  {currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -263,18 +283,14 @@ const Step2SelectServices: FC<StepComponentProps> = ({
               ))}
             </RadioGroup>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {orderData.needsAssessment?.bankingIntent && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Building className="mr-2 h-5 w-5 text-primary" />
+        <div className="space-y-3 py-2">
+          <h2 className="text-xl font-semibold flex items-center">
+              <Banknote className="mr-2 h-5 w-5 text-primary" />
               Banking Assistance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          </h2>
             <div className="flex items-center space-x-2">
               <Switch 
                 id="bankingAssistSwitch" 
@@ -293,18 +309,15 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 Standard banking assistance package selected.
               </p>
             )}
-          </CardContent>
-        </Card>
+        </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
+      <div className="space-y-3 py-2">
+          <h2 className="text-xl font-semibold flex items-center">
+            <ShoppingBag className="mr-2 h-5 w-5 text-primary" />
             <TypingText text="Popular Add-ons" speed={25} as="span" />
-          </CardTitle>
-          <CardDescription>Consider these popular services for your new company.</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </h2>
+          <p className="text-sm text-muted-foreground">Consider these popular services for your new company.</p>
           <div className="space-y-3">
             {localAddons.map(addon => ( 
               <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors">
@@ -317,7 +330,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground"><Info className="h-4 w-4"/></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground"><HelpCircle className="h-4 w-4"/></Button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>More information about {addon.name}.</p>
@@ -327,8 +340,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       <div className="flex justify-between items-center mt-8 pt-6 border-t">
         <Button variant="outline" onClick={goToPrevStep} disabled={isLoading}>

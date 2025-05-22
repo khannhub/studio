@@ -25,7 +25,7 @@ export interface BankingAssistance {
   selected?: boolean;
   option?: string;
   price?: number;
-  reasoning?: string; // From AI
+  reasoning?: string; 
 }
 
 export interface AddOn {
@@ -83,8 +83,6 @@ export interface OrderData {
   bankingAssistance?: BankingAssistance;
   addOns?: AddOn[];
   
-  // Step 2 (new) will primarily manipulate incorporation, bankingAssistance, addOns
-  // Step 3 Details (was Step 2)
   companyNames?: CompanyNameChoices;
   directors?: Person[];
   shareholders?: ShareholderInfo[];
@@ -92,20 +90,18 @@ export interface OrderData {
   deliveryAddress?: Address;
   extraRequests?: string;
 
-  // Step 4 Details (was Step 3)
   billingAddress?: Address & { useDeliveryAddress?: boolean; usePrimaryContactAddress?: boolean; };
   paymentMethod?: "card" | "paypal" | "bank_transfer";
-  paymentDetails?: { // Sensitive details would not be stored long-term like this
-    cardNumber?: string; // Example, real integration would use PCI compliant methods
+  paymentDetails?: { 
+    cardNumber?: string; 
     expiryDate?: string;
     cvv?: string;
   };
   
-  // Step 5 Details (was Step 4)
   orderId?: string;
   orderStatus?: "success" | "pending" | "failed";
   paymentDate?: string;
-  orderItems?: OrderItem[]; // To store items for review and confirmation, might be redundant with derived items in page.tsx but useful for direct passing
+  orderItems?: OrderItem[]; 
 }
 
 export interface StepComponentProps {
@@ -160,7 +156,6 @@ export const US_STATES_LIST = [
   { value: "Maryland-MD", label: "Maryland" }, { value: "Massachusetts-MA", label: "Massachusetts" }, 
   { value: "Michigan-MI", label: "Michigan" }, { value: "Minnesota-MN", label: "Minnesota" }, 
   { value: "Mississippi-MS", label: "Mississippi" }, { value: "Missouri-MO", label: "Missouri" }, 
-  // { value: "Montana-MT", label: "Montana" }, // Was missing in user's provided list, adhering to user's list
   { value: "Nebraska-NE", label: "Nebraska" }, { value: "Nevada-NV", label: "Nevada" }, 
   { value: "New Hampshire-NH", label: "New Hampshire" }, { value: "New Jersey-NJ", label: "New Jersey" }, 
   { value: "New Mexico-NM", label: "New Mexico" }, { value: "New York-NY", label: "New York" }, 
@@ -175,7 +170,22 @@ export const US_STATES_LIST = [
   { value: "Wisconsin-WI", label: "Wisconsin" }, { value: "Wyoming-WY", label: "Wyoming" }
 ];
 
-export const COMPANY_TYPES_LIST = [
-  'Limited Liability Company (LLC)', 'Corporation (Corp./Inc.)', 'Private Limited Company (Ltd.)',
-  'Public Limited Company (PLC)', 'Foundation', 'Trust', 'Partnership', 'Sole Proprietorship', 'International Business Company (IBC)'
+export const US_COMPANY_TYPES_LIST = [
+  'Limited Liability Company', 
+  'S Corporation', 
+  'C Corporation'
+];
+
+export const INTERNATIONAL_COMPANY_TYPES_LIST = [
+  'Company Limited', 
+  'Limited Liability Company', // Can exist internationally
+  'International Business Company', 
+  'Private Limited Company', 
+  'Public Limited Company',
+  'Limited by Shares',
+  'Global Business Company', 
+  'Authorised Company',
+  'Limited Liability Partnership', 
+  'Exempted Company', 
+  'Corporation' // Generic, can exist outside US
 ];
