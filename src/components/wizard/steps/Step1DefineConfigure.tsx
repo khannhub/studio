@@ -381,18 +381,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   ];
 
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
-  const canProceedFromEmail = currentQuestion === 0 && isEmailValid;
+
+  let isNextButtonDisabled = isLoading || isPending;
+  if (!isNextButtonDisabled) { // Only check further conditions if not already disabled by loading state
+    if (currentQuestion === 0) {
+      if (!isEmailValid) isNextButtonDisabled = true;
+    } else if (currentQuestion === 1) {
+      if (!orderData.needsAssessment?.purpose) isNextButtonDisabled = true;
+    } else if (currentQuestion === 2) {
+      if (!orderData.needsAssessment?.priorities) isNextButtonDisabled = true;
+    } else if (currentQuestion === 3) {
+      if (!orderData.needsAssessment?.region) isNextButtonDisabled = true;
+    } else if (currentQuestion === 5) { // Banking Intent question
+      if (orderData.needsAssessment?.bankingIntent === undefined) isNextButtonDisabled = true;
+    }
+    // For question 4 (Business Description), isNextButtonDisabled remains false (unless isLoading/isPending), as it's optional.
+  }
   
-  const needsAssessmentComplete = 
-    currentQuestion >= 1 && currentQuestion <= 3 ? // Corresponds to Purpose, Priorities, Region
-    Boolean(orderData.needsAssessment?.purpose) &&
-    Boolean(orderData.needsAssessment?.priorities) &&
-    Boolean(orderData.needsAssessment?.region)
-    : true; // For other questions, or if not these specific ones
-
-  const canProceedFromQuestions = currentQuestion > 0 && currentQuestion < questions.length -1 && needsAssessmentComplete;
-  const canProceedToNextStep = currentQuestion === questions.length -1 && orderData.incorporation?.packageName && needsAssessmentComplete;
-
+  const isProceedToDetailsButtonDisabled =
+    isLoading ||
+    isPending ||
+    !orderData.incorporation?.packageName ||
+    !orderData.needsAssessment?.purpose ||
+    !orderData.needsAssessment?.priorities ||
+    !orderData.needsAssessment?.region;
 
   return (
     <div className="space-y-8">
@@ -405,14 +417,14 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           <ChevronLeft className="mr-2 h-4 w-4" /> Previous
         </Button>
         {currentQuestion < questions.length - 1 ? (
-          <Button 
-            onClick={nextQuestion} 
-            disabled={isLoading || isPending || (currentQuestion === 0 && !canProceedFromEmail) || (currentQuestion >=1 && currentQuestion <=3 && !needsAssessmentComplete) }
+          <Button
+            onClick={nextQuestion}
+            disabled={isNextButtonDisabled}
           >
             Next <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={goToNextStep} disabled={isLoading || isPending || !canProceedToNextStep}>
+          <Button onClick={goToNextStep} disabled={isProceedToDetailsButtonDisabled}>
             Proceed to Details <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         )}
@@ -422,5 +434,3 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
-
-    
