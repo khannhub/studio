@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, Wand2, ChevronRight, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout, MapPin, Flag, PiggyBank, Zap, FileText, Lightbulb } from 'lucide-react';
 import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { US_STATES_LIST } from '@/lib/types';
+import { TypingText } from '@/components/common/TypingText';
 
 
 const purposeOptions = [
@@ -41,12 +42,12 @@ const prioritiesOptions = [
 const regionOptions = [
   { id: 'usa', value: 'United States of America', label: 'USA', icon: <Flag className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'global_international', value: 'Global / International (Non-USA Focus)', label: 'Global / Intl.', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'asia', value: 'Asia (e.g., Singapore, Hong Kong)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'europe', value: 'Europe', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'asia', value: 'Asia', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'mena', value: 'Middle East & North Africa (MENA)', label: 'MENA', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'latam_caribbean', value: 'Latin America & Caribbean', label: 'LATAM & Caribbean', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'canada', value: 'Canada', label: 'Canada', icon: <MapPin className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_region', value: 'Other Specific Region', label: 'Other Region', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_region', value: 'Other Specific Region', label: 'Other Region', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon to Briefcase
 ];
 
 
@@ -73,8 +74,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   };
 
   const handleGetRecommendationAndProceed = () => {
-    if (!orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region) {
-      toast({ title: "Missing Information", description: "Please select purpose, priorities, and region to get recommendations.", variant: "destructive" });
+    if (!orderData.userEmail || !orderData.userPhone || !orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region) {
+      toast({ title: "Missing Information", description: "Please complete all required fields to get recommendations.", variant: "destructive" });
       return;
     }
 
@@ -82,10 +83,11 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       businessPurpose: orderData.needsAssessment.purpose,
       priorities: orderData.needsAssessment.priorities,
       region: orderData.needsAssessment.region,
+      // bankingIntent removed
     };
     
     const inputsHaveChangedOrNoRecExists = !lastSuccessfulAiCallInputs ||
-      !orderData.incorporation?.aiBestRecommendation || 
+      !orderData.incorporation?.aiRecommendedReasoning || // Check if a recommendation exists
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
@@ -104,31 +106,35 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         const recommendations: RecommendIncorporationOutput = await recommendIncorporation(currentAiInputs);
         const bestRec = recommendations.bestRecommendation;
         
-        let finalJurisdiction = bestRec.jurisdiction;
-        let finalState = bestRec.state;
-
-        // If user's primary region is USA, ensure the recommendation reflects this.
-        if (currentAiInputs.region === 'United States of America') {
-            finalJurisdiction = 'United States of America';
-            // Ensure state is set if AI somehow missed it for US primary region.
-            finalState = bestRec.state || (US_STATES_LIST.find(s => s.label === "Delaware")?.value); 
-        }
-        
         updateOrderData(prev => {
-          const newIncorporationDetails: IncorporationDetails = {
-            packageName: prev.incorporation?.packageName, 
-            jurisdiction: finalJurisdiction,
-            state: finalState,
+          let newIncorporationDetails: IncorporationDetails = {
+            ...prev.incorporation, // Keep existing package name etc.
+            jurisdiction: bestRec.jurisdiction,
+            state: bestRec.state,
             companyType: bestRec.companyType,
-            price: bestRec.price, 
+            price: bestRec.price,
+            
             aiBestRecommendation: { ...bestRec, isBestPick: true },
             aiAlternativeRecommendations: recommendations.alternativeRecommendations.map(alt => ({...alt, isBestPick: false})),
+            
+            // Store AI's direct recommendation separately
+            aiRecommendedJurisdiction: bestRec.jurisdiction,
+            aiRecommendedState: bestRec.state,
+            aiRecommendedCompanyType: bestRec.companyType,
+            aiRecommendedReasoning: bestRec.reasoning,
           };
+
+          // If primary region is USA, ensure jurisdiction is set to USA
+          if (currentAiInputs.region === 'United States of America') {
+              newIncorporationDetails.jurisdiction = 'United States of America';
+              // Ensure state is from recommendation if AI provided it for USA
+              newIncorporationDetails.state = bestRec.state; 
+          }
           
           let updatedBankingAssistance = prev.bankingAssistance;
-          if (prev.bankingAssistance?.selected) {
-            const recStateDisplay = finalState ? ` (${finalState.split('-')[0]})` : '';
-            const bankingReasoning = `We suggest considering banking options suitable for ${finalJurisdiction}${recStateDisplay} (${bestRec.companyType}).`;
+          if (prev.bankingAssistance?.selected) { // If banking was already selected
+            const recStateDisplay = newIncorporationDetails.state ? ` (${newIncorporationDetails.state.split('-')[0]})` : '';
+            const bankingReasoning = `We suggest considering banking options suitable for ${newIncorporationDetails.jurisdiction}${recStateDisplay} (${newIncorporationDetails.companyType}).`;
             updatedBankingAssistance = {
                 ...prev.bankingAssistance,
                 reasoning: bankingReasoning,
@@ -147,7 +153,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
       } catch (error) {
         console.error("Error getting recommendation:", error);
-        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations at this time. Please try again or ensure all fields are completed.", variant: "destructive" });
+        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations. Please try again or ensure all fields are completed.", variant: "destructive" });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
@@ -174,7 +180,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           className={cn(
             "flex flex-col items-center justify-center text-center p-3 sm:p-4 border rounded-lg cursor-pointer transition-all duration-200 ease-in-out",
             "hover:-translate-y-1 hover:shadow-lg", 
-            selectedValue === option.value ? 'border-primary ring-2 ring-primary shadow-md' : 'border-border hover:border-primary/70'
+            selectedValue === option.value ? 'border-primary ring-2 ring-primary shadow-md' : 'border-border hover:border-primary/70' // Removed bg-primary/10
           )}
         >
           <RadioGroupItem value={option.value} id={`${groupName}-${option.id}`} className="sr-only" />
@@ -197,7 +203,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       !orderData.needsAssessment?.purpose ||
       !orderData.needsAssessment?.priorities ||
       !orderData.needsAssessment?.region;
-
+      // bankingIntent removed from validation
 
   return (
     <div className="space-y-8">
@@ -273,6 +279,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Banking assistance Switch removed */}
 
       <div className="flex justify-end items-center mt-8 pt-6 border-t">
         <Button onClick={handleGetRecommendationAndProceed} disabled={isProceedButtonDisabled} className="w-full md:w-auto">
