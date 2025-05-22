@@ -23,7 +23,7 @@ const RecommendIncorporationInputSchema = z.object({
     .describe(
       'The priorities of the business, such as tax optimization, privacy, or ease of management.'
     ),
-  region: z.string().describe('The primary region of operation for the business.'),
+  region: z.string().describe('The primary region of operation for the business. This could be "United States of America" or other international regions/global.'),
 });
 export type RecommendIncorporationInput = z.infer<
   typeof RecommendIncorporationInputSchema
@@ -65,11 +65,16 @@ const prompt = ai.definePrompt({
   Priorities: {{{priorities}}}
   Region of Operation: {{{region}}}
 
-  Constraints:
-  1. The recommended 'jurisdiction' MUST be chosen exclusively from the following list: ${jurisdictionsString}.
-  2. If 'jurisdiction' is "United States of America", you MUST also recommend a 'state'. This 'state' MUST be chosen exclusively from the following list and provided in "FullName-Abbreviation" format (e.g., "California-CA"): ${usStatesString}. If 'jurisdiction' is not "United States of America", the 'state' field should be omitted or null.
-  3. If the recommended 'jurisdiction' is "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${usCompanyTypesString}.
-  4. If the recommended 'jurisdiction' is NOT "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${intlCompanyTypesString}.
+  Constraints & Instructions:
+  1.  If the user's 'Region of Operation' is "United States of America":
+      a. You MUST set the 'jurisdiction' output field to "United States of America".
+      b. You MUST then recommend a 'state' from the US States list. This 'state' MUST be chosen exclusively from the following list and provided in "FullName-Abbreviation" format (e.g., "California-CA"): ${usStatesString}.
+      c. The 'companyType' MUST be chosen exclusively from this US-specific list: ${usCompanyTypesString}.
+  2.  If the user's 'Region of Operation' is NOT "United States of America":
+      a. The recommended 'jurisdiction' MUST be chosen exclusively from the following list: ${jurisdictionsString}.
+      b. If you choose "United States of America" as the 'jurisdiction' (despite the primary region not being USA), you MUST also recommend a 'state' from the US States list: ${usStatesString}, in "FullName-Abbreviation" format. Otherwise, the 'state' field should be omitted or null.
+      c. If the recommended 'jurisdiction' is "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${usCompanyTypesString}.
+      d. If the recommended 'jurisdiction' is NOT "United States of America", the 'companyType' MUST be chosen exclusively from this list: ${intlCompanyTypesString}.
   
   Provide a 'reasoning' for your recommendation. In your 'reasoning', use markdown bold syntax (**text**) to highlight the most important phrases or key ideas, explaining why the chosen jurisdiction (and state, if applicable) and company type are suitable.
   `,

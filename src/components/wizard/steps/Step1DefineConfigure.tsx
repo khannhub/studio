@@ -2,7 +2,7 @@
 'use client';
 
 import type { FC } from 'react';
-import { useState, useTransition, useEffect, useRef } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import type { StepComponentProps, OrderData, IncorporationDetails } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, MailQuestion, HelpCircle, FileText, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout } from 'lucide-react';
-import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
+import { Loader2, Wand2, ChevronRight, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout, MapPin, Flag } from 'lucide-react';
+import { recommendIncorporation, type RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import TypingText from '@/components/common/TypingText';
@@ -29,20 +29,22 @@ const prioritiesOptions = [
   { id: 'tax', value: 'Tax Optimization', label: 'Tax Optimization', icon: <Target className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'privacy', value: 'Privacy & Anonymity', label: 'Privacy & Anonymity', icon: <EyeOff className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'ease', value: 'Ease of Management & Low Compliance', label: 'Ease of Management', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'market_access', value: 'Access to Specific Markets/Banking', label: 'Market/Bank Access', icon: <Landmark className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'credibility', value: 'Credibility & Reputation', label: 'Credibility', icon: <Award className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_priority', value: 'Other', label: 'Other Priority', icon: <MailQuestion className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_priority', value: 'Other', label: 'Other Priority', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon to briefcase for consistency
 ];
 
 const regionOptions = [
-  { id: 'global', value: 'Global / No Specific Region', label: 'Global / Non-Specific', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'north_america', value: 'North America (USA, Canada)', label: 'North America', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
+  { id: 'usa', value: 'United States of America', label: 'USA', icon: <Flag className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'global_international', value: 'Global / International (Non-USA)', label: 'Global / Intl.', icon: <Globe className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'europe', value: 'Europe (EU/EEA, UK)', label: 'Europe', icon: <Euro className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'asia', value: 'Asia (Singapore, Hong Kong, etc.)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'mena', value: 'Middle East & Africa', label: 'MENA', icon: <Building className="h-5 w-5 mb-2 text-primary" /> }, // Changed icon
-  { id: 'latam', value: 'Latin America & Caribbean', label: 'LATAM & Caribbean', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_region', value: 'Other', label: 'Other Region', icon: <FileText className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'asia', value: 'Asia (e.g., Singapore, Hong Kong)', label: 'Asia', icon: <Sunrise className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'mena', value: 'Middle East & Africa', label: 'MENA', icon: <Pyramid className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'latam_caribbean', value: 'Latin America & Caribbean', label: 'LATAM & Caribbean', icon: <Sprout className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'canada', value: 'Canada', label: 'Canada', icon: <MapPin className="h-5 w-5 mb-2 text-primary" /> }, // Example, consider better icon
+  { id: 'other_region', value: 'Other Specific Region', label: 'Other Region', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
 ];
+
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
   orderData,
@@ -78,14 +80,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       region: orderData.needsAssessment.region,
     };
 
-    // Check if inputs have changed since last successful AI call OR if no recommendation exists yet
-    const inputsHaveChanged = !lastSuccessfulAiCallInputs ||
-      !orderData.incorporation?.aiRecommendedReasoning || // Ensure reasoning exists
+    const inputsHaveChangedOrNoRecExists = !lastSuccessfulAiCallInputs ||
+      !orderData.incorporation?.aiRecommendedReasoning ||
       lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
       lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
       lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
 
-    if (!inputsHaveChanged && orderData.incorporation?.aiRecommendedReasoning) {
+    if (!inputsHaveChangedOrNoRecExists) {
       // Inputs haven't changed and a recommendation exists, proceed directly
       goToNextStep();
       return;
@@ -98,26 +99,32 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       try {
         const recommendation = await recommendIncorporation(currentAiInputs);
         
+        // If AI recommends USA or if primary region is USA, ensure jurisdiction is set to USA
+        const finalJurisdiction = currentAiInputs.region === 'United States of America' 
+            ? 'United States of America' 
+            : recommendation.jurisdiction;
+        const finalState = finalJurisdiction === 'United States of America' ? recommendation.state : '';
+
         updateOrderData(prev => ({
           ...prev,
-          incorporation: { // Set both user-selectable and AI-recommended fields
-            ...prev.incorporation, // Preserve existing package/price if any
-            jurisdiction: recommendation.jurisdiction,
-            state: recommendation.state,
+          incorporation: { 
+            ...prev.incorporation,
+            jurisdiction: finalJurisdiction,
+            state: finalState,
             companyType: recommendation.companyType,
-            aiRecommendedJurisdiction: recommendation.jurisdiction,
-            aiRecommendedState: recommendation.state,
+            aiRecommendedJurisdiction: recommendation.jurisdiction, // Store AI's raw recommendation
+            aiRecommendedState: recommendation.state, // Store AI's raw recommendation
             aiRecommendedCompanyType: recommendation.companyType,
             aiRecommendedReasoning: recommendation.reasoning,
           },
           ...(prev.needsAssessment?.bankingIntent && {
             bankingAssistance: {
                 ...prev.bankingAssistance,
-                reasoning: `We suggest considering banking options suitable for ${recommendation.jurisdiction}${recommendation.state ? ` (${recommendation.state.split('-')[0]})` : ''} (${recommendation.companyType}).`,
+                reasoning: `Based on your profile, we suggest considering banking options suitable for ${finalJurisdiction}${finalState ? ` (${finalState.split('-')[0]})` : ''} (${recommendation.companyType}).`,
             }
           })
         }));
-        setLastSuccessfulAiCallInputs(currentAiInputs); // Store successful inputs
+        setLastSuccessfulAiCallInputs(currentAiInputs); 
         goToNextStep();
 
       } catch (error) {
@@ -140,7 +147,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     <RadioGroup
       value={selectedValue}
       onValueChange={onChange}
-      className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-2"
+      className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mt-2"
     >
       {options.map(option => (
         <Label
@@ -154,7 +161,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         >
           <RadioGroupItem value={option.value} id={`${groupName}-${option.id}`} className="sr-only" />
           {option.icon}
-          <span className="text-xs sm:text-sm font-medium leading-tight">{option.label}</span>
+          <span className="text-xs sm:text-sm font-medium leading-tight mt-1">{option.label}</span>
         </Label>
       ))}
     </RadioGroup>
@@ -217,26 +224,26 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         
         <div className="space-y-6">
           <div>
-            <Label className="flex items-center text-base font-medium">
-                <TypingText text="What is the main purpose of your business?" speed={25} as="span" className="flex items-center" />
+            <Label className="text-base font-medium">
+                What is the main purpose of your business?
             </Label>
             {renderSelectionCards(purposeOptions, orderData.needsAssessment?.purpose, (value) => handleNeedsAssessmentChange('purpose', value), 'purpose')}
           </div>
           <div>
-            <Label className="flex items-center text-base font-medium">
-                 <TypingText text="What are your key priorities?" speed={25} as="span" className="flex items-center" />
+            <Label className="text-base font-medium">
+                 What are your key priorities?
             </Label>
             {renderSelectionCards(prioritiesOptions, orderData.needsAssessment?.priorities, (value) => handleNeedsAssessmentChange('priorities', value), 'priorities')}
           </div>
           <div>
-            <Label className="flex items-center text-base font-medium">
-                 <TypingText text="What is your primary region of operation?" speed={25} as="span" className="flex items-center" />
+            <Label className="text-base font-medium">
+                 What is your primary region of operation?
             </Label>
             {renderSelectionCards(regionOptions, orderData.needsAssessment?.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
           </div>
           <div>
-            <Label htmlFor="businessDescription" className="flex items-center text-base font-medium">
-                 <TypingText text="Briefly describe your business (optional)." speed={25} as="span" className="flex items-center" />
+            <Label htmlFor="businessDescription" className="text-base font-medium">
+                 Briefly describe your business (optional).
             </Label>
             <Textarea
               id="businessDescription"
@@ -247,8 +254,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             />
           </div>
            <div>
-            <Label className="flex items-center text-base font-medium mb-2">
-                 <TypingText text="Do you require banking assistance?" speed={25} as="span" className="flex items-center" />
+            <Label className="text-base font-medium mb-2">
+                 Do you require banking assistance?
             </Label>
             <div className="flex items-center space-x-3">
               <Switch

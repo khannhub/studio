@@ -11,9 +11,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wand2, ChevronRight, ChevronLeft, Info, Building, ShoppingBag, HelpCircle, Package, Banknote } from 'lucide-react';
+import { Wand2, ChevronRight, ChevronLeft, HelpCircle, Package, Banknote, ShoppingBag, Building, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import TypingText from '@/components/common/TypingText';
 import { cn } from '@/lib/utils';
 
 const incorporationPackages = [
@@ -38,14 +37,30 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   }, [orderData.addOns]);
 
   const [currentCompanyTypes, setCurrentCompanyTypes] = useState<string[]>(INTERNATIONAL_COMPANY_TYPES_LIST);
+  const [isPrimaryRegionUSA, setIsPrimaryRegionUSA] = useState(false);
 
   useEffect(() => {
-    if (orderData.incorporation?.jurisdiction === 'United States of America') {
+    const primaryRegionIsUSA = orderData.needsAssessment?.region === 'United States of America';
+    setIsPrimaryRegionUSA(primaryRegionIsUSA);
+
+    if (primaryRegionIsUSA) {
       setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
+      if (orderData.incorporation?.jurisdiction !== 'United States of America') {
+        updateOrderData(prev => ({
+            incorporation: {
+                ...prev.incorporation,
+                jurisdiction: 'United States of America',
+            }
+        }));
+      }
     } else {
-      setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+      if (orderData.incorporation?.jurisdiction === 'United States of America') {
+        setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
+      } else {
+        setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+      }
     }
-  }, [orderData.incorporation?.jurisdiction]);
+  }, [orderData.needsAssessment?.region, orderData.incorporation?.jurisdiction, updateOrderData]);
 
 
   useEffect(() => {
@@ -89,26 +104,26 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   
   const handleIncorporationFieldChange = (field: keyof IncorporationDetails, value: string) => {
     updateOrderData(prev => {
-      const newIncorporationData = {
+      let newIncorporationData = {
         ...prev.incorporation,
         [field]: value,
       } as IncorporationDetails;
 
-      // Clear state if jurisdiction is not USA
-      if (field === 'jurisdiction' && value !== 'United States of America') {
-        newIncorporationData.state = '';
-      }
-      
-      // Update company type list and potentially clear company type if invalid
       if (field === 'jurisdiction') {
-        const newCompanyTypesList = value === 'United States of America' 
-          ? US_COMPANY_TYPES_LIST 
-          : INTERNATIONAL_COMPANY_TYPES_LIST;
-        if (newIncorporationData.companyType && !newCompanyTypesList.includes(newIncorporationData.companyType)) {
-          newIncorporationData.companyType = ''; // Clear if no longer valid
+        if (value === 'United States of America') {
+          setCurrentCompanyTypes(US_COMPANY_TYPES_LIST);
+           if (!newIncorporationData.companyType || !US_COMPANY_TYPES_LIST.includes(newIncorporationData.companyType)) {
+            newIncorporationData.companyType = prev.incorporation?.aiRecommendedCompanyType && US_COMPANY_TYPES_LIST.includes(prev.incorporation.aiRecommendedCompanyType) ? prev.incorporation.aiRecommendedCompanyType : '';
+          }
+        } else {
+          setCurrentCompanyTypes(INTERNATIONAL_COMPANY_TYPES_LIST);
+           if (!newIncorporationData.companyType || !INTERNATIONAL_COMPANY_TYPES_LIST.includes(newIncorporationData.companyType)) {
+            newIncorporationData.companyType = prev.incorporation?.aiRecommendedCompanyType && INTERNATIONAL_COMPANY_TYPES_LIST.includes(prev.incorporation.aiRecommendedCompanyType) ? prev.incorporation.aiRecommendedCompanyType : '';
+          }
+          newIncorporationData.state = ''; // Clear state if jurisdiction is not USA
         }
       }
-
+      
       updateIncorporationServiceOrderItem(newIncorporationData);
       return { incorporation: newIncorporationData };
     });
@@ -133,7 +148,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     const defaultOption = "Standard Banking Assistance";
     let optionToShow = orderData.bankingAssistance?.option || defaultOption;
     
-    if (selected && suggestedReasoning && !orderData.bankingAssistance?.option) { // Use suggested if available and no option set
+    if (selected && suggestedReasoning && !orderData.bankingAssistance?.option) { 
         optionToShow = suggestedReasoning;
     } else if (!selected) {
         optionToShow = ''; 
@@ -176,7 +191,13 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     }
   };
 
-  const isProceedButtonDisabled = isLoading || !orderData.incorporation?.packageName || !orderData.incorporation?.jurisdiction || !orderData.incorporation?.companyType || (orderData.incorporation.jurisdiction === 'United States of America' && !orderData.incorporation.state);
+  const isProceedButtonDisabled = isLoading || 
+    !orderData.incorporation?.packageName || 
+    !orderData.incorporation?.jurisdiction || 
+    !orderData.incorporation?.companyType || 
+    (orderData.incorporation.jurisdiction === 'United States of America' && !orderData.incorporation.state);
+
+  const packageSectionLabel = isPrimaryRegionUSA ? "Incorporation Package" : "Select Processing Speed / Package Tier";
 
   return (
     <div className="space-y-8">
@@ -199,35 +220,38 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
       <div className="space-y-6 py-2">
           <h2 className="text-xl font-semibold flex items-center">
-            <Package className="mr-2 h-5 w-5 text-primary"/>
-            <TypingText text="Select Your Incorporation Details" speed={25} as="span" />
+            <Building className="mr-2 h-5 w-5 text-primary"/>
+            Select Your Incorporation Details
           </h2>
           <p className="text-sm text-muted-foreground">Choose your jurisdiction, company type, and desired package.</p>
         
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
-            {/* Column 1: Jurisdiction and State */}
+            {/* Column 1: Jurisdiction (conditional) and State */}
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                <Select
-                  value={orderData.incorporation?.jurisdiction || ''}
-                  onValueChange={(value) => handleIncorporationFieldChange('jurisdiction', value)}
-                >
-                  <SelectTrigger id="jurisdiction" className="w-full mt-1">
-                    <SelectValue placeholder="Select Jurisdiction" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isPrimaryRegionUSA && (
+                <div>
+                  <Label htmlFor="jurisdiction">Jurisdiction</Label>
+                  <Select
+                    value={orderData.incorporation?.jurisdiction || ''}
+                    onValueChange={(value) => handleIncorporationFieldChange('jurisdiction', value)}
+                  >
+                    <SelectTrigger id="jurisdiction" className="w-full mt-1">
+                      <SelectValue placeholder="Select Jurisdiction" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
-              {orderData.incorporation?.jurisdiction === 'United States of America' && (
+              {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
                 <div>
                   <Label htmlFor="state">State</Label>
                   <Select
                     value={orderData.incorporation?.state || ''}
                     onValueChange={(value) => handleIncorporationFieldChange('state', value)}
+                    disabled={!isPrimaryRegionUSA && orderData.incorporation?.jurisdiction !== 'United States of America'}
                   >
                     <SelectTrigger id="state" className="w-full mt-1">
                       <SelectValue placeholder="Select State" />
@@ -245,6 +269,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
               <Select
                 value={orderData.incorporation?.companyType || ''}
                 onValueChange={(value) => handleIncorporationFieldChange('companyType', value)}
+                disabled={!orderData.incorporation?.jurisdiction}
               >
                 <SelectTrigger id="companyType" className="w-full mt-1">
                   <SelectValue placeholder="Select Company Type" />
@@ -257,7 +282,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
           </div>
 
           <div>
-            <Label>Incorporation Package</Label>
+            <Label>{packageSectionLabel}</Label>
             <RadioGroup
               value={orderData.incorporation?.packageName || ""}
               onValueChange={handleIncorporationPackageSelect}
@@ -315,7 +340,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
       <div className="space-y-3 py-2">
           <h2 className="text-xl font-semibold flex items-center">
             <ShoppingBag className="mr-2 h-5 w-5 text-primary" />
-            <TypingText text="Popular Add-ons" speed={25} as="span" />
+            Popular Add-ons
           </h2>
           <p className="text-sm text-muted-foreground">Consider these popular services for your new company.</p>
           <div className="space-y-3">
@@ -330,7 +355,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground"><HelpCircle className="h-4 w-4"/></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground"><Info className="h-4 w-4"/></Button>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>More information about {addon.name}.</p>
