@@ -7,6 +7,7 @@ import type { StepComponentProps, OrderData, AddOn, IncorporationDetails, Bankin
 import { INITIAL_ADDONS } from '@/lib/types'; // Ensure INITIAL_ADDONS is imported
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import AnimatedPlaceholderInput from '@/components/common/AnimatedPlaceholderInput'; // IMPORT
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,20 +87,19 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     if (contentWrapperRef.current) {
       const newHeight = contentWrapperRef.current.scrollHeight;
       setCurrentHeight(newHeight > 0 ? newHeight : 'auto');
-      // Enable transitions after the initial height is set and a short delay
       const timer = setTimeout(() => {
         setApplyHeightTransition(true);
       }, 50); 
       return () => clearTimeout(timer);
     }
-  }, []); // Runs once on mount to set initial height
+  }, []); 
 
   useEffect(() => {
     if (applyHeightTransition && contentWrapperRef.current) {
       const newHeight = contentWrapperRef.current.scrollHeight;
       setCurrentHeight(newHeight > 0 ? newHeight : 'auto');
     }
-  }, [displayedQuestionIndex, applyHeightTransition]); // Update height when question changes
+  }, [displayedQuestionIndex, applyHeightTransition]); 
 
   useEffect(() => {
     if (!orderData.addOns || orderData.addOns.length === 0) {
@@ -238,14 +238,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   );
 
   const questions = [
-    // Question 0: Email & Phone
     <div key="q0" className="space-y-4">
       <div>
         <TypingText text="Let's get started. What's your email?" speed={30} className="text-lg font-medium block mb-1" as="label" />
-        <Input
+        <AnimatedPlaceholderInput
           id="email"
           type="email"
-          placeholder="you@example.com"
+          animatedPlaceholder="you@example.com"
           value={orderData.userEmail || ''}
           onChange={(e) => updateOrderData({ userEmail: e.target.value })}
           className="mt-1"
@@ -254,7 +253,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       </div>
       <div>
         <TypingText text="And your phone number?" speed={30} className="text-lg font-medium block mb-1" as="label" />
-        <Input
+        <Input // Standard input for phone for now, or also make AnimatedPlaceholderInput
           id="phone"
           type="tel"
           placeholder="+1 (555) 123-4567"
@@ -416,7 +415,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
     setTimeout(() => {
       setCurrentLogicalQuestion(newLogicalIndex);
-      setDisplayedQuestionIndex(newLogicalIndex); // This triggers useEffect for height change
+      setDisplayedQuestionIndex(newLogicalIndex); 
       setAnimationName(direction === 'next' ? 'animate-slide-in-from-bottom' : 'animate-slide-in-from-top');
       
       setTimeout(() => {
@@ -478,7 +477,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <div className="overflow-hidden"> {/* This clips the sliding animation */}
+      <div className="overflow-hidden"> 
         <div
           key={displayedQuestionIndex}
           className={cn(
@@ -487,7 +486,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           )}
           style={{ height: currentHeight }}
         >
-          <div className="p-2" ref={contentWrapperRef}> {/* Content for height measurement */}
+          <div className="p-2" ref={contentWrapperRef}> 
             {questions[displayedQuestionIndex]}
           </div>
         </div>
