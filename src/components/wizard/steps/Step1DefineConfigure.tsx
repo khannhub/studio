@@ -396,7 +396,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   ];
 
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
-  const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== '';
+  const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== ''; // Basic check
   let isNextButtonDisabled = isLoading || isPending;
 
   if (!isNextButtonDisabled) {
@@ -420,6 +420,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;
         break;
       default:
+        // For the last step (AI recommendations and service selection),
+        // specific logic is handled by isProceedToDetailsButtonDisabled
         break;
     }
   }
@@ -434,8 +436,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
   return (
     <div className="space-y-8">
-      <div className="p-2 transition-all duration-300 ease-in-out">
-         {questions[currentQuestion]}
+      <div className="overflow-hidden">
+        <div key={currentQuestion} className="animate-fade-slide-in-bottom">
+          <div className="p-2">
+            {questions[currentQuestion]}
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between items-center mt-8 pt-6 border-t">
