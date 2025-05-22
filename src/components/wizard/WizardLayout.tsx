@@ -35,9 +35,11 @@ const WizardLayout: FC<WizardLayoutProps> = ({
         orderItemCount={orderItems.filter(item => item.quantity > 0).length}
       />
       <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
+        {/* This div centers content horizontally and grows vertically to push footer down */}
         <div className="max-w-3xl mx-auto flex flex-col flex-grow w-full">
           <ProgressBar currentStep={currentStep} totalSteps={totalSteps} stepNames={stepNames} />
-          <div className="mt-8 bg-card p-6 sm:p-8 rounded-xl shadow-xl flex-grow overflow-y-auto min-h-0">
+          {/* Wizard card: sizes to content, scrolls if content is too tall for available space */}
+          <div className="mt-8 bg-card p-6 sm:p-8 rounded-xl shadow-xl overflow-y-auto">
             {children}
           </div>
         </div>
