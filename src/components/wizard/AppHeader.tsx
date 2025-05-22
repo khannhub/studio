@@ -1,6 +1,7 @@
 import type { FC } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, HelpCircle, Save, LogOut, Building2 } from 'lucide-react';
+import { ShoppingCart, HelpCircle, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AppHeaderProps {
@@ -11,6 +12,7 @@ interface AppHeaderProps {
 
 const AppHeader: FC<AppHeaderProps> = ({ title, onToggleSummary, orderItemCount }) => {
   const { toast } = useToast();
+  const logoUrl = "https://d21l9vkgwnizti.cloudfront.net/uploads/one-ibc-logo.svg";
 
   const handleSaveExit = () => {
     // In a real app, this would trigger saving state to backend
@@ -24,8 +26,8 @@ const AppHeader: FC<AppHeaderProps> = ({ title, onToggleSummary, orderItemCount 
     <header className="sticky top-0 z-40 w-full border-b bg-card shadow-sm">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center space-x-3">
-          <Building2 className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+          <Image src={logoUrl} alt="One IBC Logo" width={120} height={32} priority className="h-8 w-auto" />
+          {/* <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1> */}
         </div>
         <nav className="flex items-center space-x-2">
           <Button variant="ghost" size="icon" aria-label="Help">
