@@ -9,12 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Switch } from "@/components/ui/switch"; // Added Switch import
+import { Switch } from "@/components/ui/switch";
 import { Loader2, Wand2, ChevronRight, Info, Building, ShieldCheck, Globe, Target, Briefcase, TrendingUp, User, PhoneIcon, MailQuestion, HelpCircle, FileText, ShoppingCart, Users, Cpu, EyeOff, SlidersHorizontal, Award, Landmark, Euro, Sunrise, Pyramid, Sprout } from 'lucide-react';
-import { recommendIncorporation, type RecommendIncorporationInput } from '@/ai/flows/recommend-incorporation';
+import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
-import TypingText from '@/components/common/TypingText';
 import { cn } from '@/lib/utils';
 
 const purposeOptions = [
@@ -52,9 +50,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   isLoading: isGlobalLoading,
   setIsLoading: setGlobalIsLoading,
 }) => {
-  const [aiRecommendation, setAiRecommendation] = useState<Pick<IncorporationDetails, 'jurisdiction' | 'companyType' | 'reasoning'> | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [recommendationStage, setRecommendationStage] = useState<'initial' | 'fetched' | 'error'>('initial');
+  const [lastSuccessfulAiCallInputs, setLastSuccessfulAiCallInputs] = useState<RecommendIncorporationInput | null>(null);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -67,30 +64,37 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     }));
   };
 
-  const handleGetRecommendation = () => {
+  const handleGetRecommendationAndProceed = () => {
     if (!orderData.needsAssessment?.purpose || !orderData.needsAssessment?.priorities || !orderData.needsAssessment?.region) {
       toast({ title: "Missing Information", description: "Please select purpose, priorities, and region to get recommendations.", variant: "destructive" });
       return;
     }
+
+    const currentAiInputs: RecommendIncorporationInput = {
+      businessPurpose: orderData.needsAssessment.purpose,
+      priorities: orderData.needsAssessment.priorities,
+      region: orderData.needsAssessment.region,
+    };
+
+    // Check if inputs have changed since last successful AI call
+    const inputsHaveChanged = !lastSuccessfulAiCallInputs ||
+      lastSuccessfulAiCallInputs.businessPurpose !== currentAiInputs.businessPurpose ||
+      lastSuccessfulAiCallInputs.priorities !== currentAiInputs.priorities ||
+      lastSuccessfulAiCallInputs.region !== currentAiInputs.region;
+
+    if (!inputsHaveChanged && orderData.incorporation?.reasoning) {
+      // Inputs haven't changed and a recommendation exists, proceed directly
+      goToNextStep();
+      return;
+    }
+    
     setIsAiLoading(true);
     setGlobalIsLoading(true);
-    setAiRecommendation(null); // Clear previous recommendation
+    
     startTransition(async () => {
       try {
-        const input: RecommendIncorporationInput = {
-          businessPurpose: orderData.needsAssessment!.purpose!,
-          priorities: orderData.needsAssessment!.priorities!,
-          region: orderData.needsAssessment!.region!,
-        };
-        const recommendation = await recommendIncorporation(input);
+        const recommendation = await recommendIncorporation(currentAiInputs);
         
-        const recommendationResult = {
-          jurisdiction: recommendation.jurisdiction,
-          companyType: recommendation.companyType,
-          reasoning: recommendation.reasoning,
-        };
-        setAiRecommendation(recommendationResult);
-
         updateOrderData(prev => ({
           ...prev,
           incorporation: {
@@ -106,13 +110,14 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             }
           })
         }));
-        setRecommendationStage('fetched');
-        toast({ title: "AI Recommendations Loaded", description: "Suggestions for jurisdiction and company type are now available.", variant: "default" });
+        setLastSuccessfulAiCallInputs(currentAiInputs); // Store successful inputs
+        toast({ title: "AI Recommendations Ready", description: "Proceeding to service selection.", variant: "default" });
+        goToNextStep();
 
       } catch (error) {
         console.error("Error getting AI recommendation:", error);
-        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again or proceed manually.", variant: "destructive" });
-        setRecommendationStage('error');
+        toast({ title: "AI Recommendation Failed", description: "Could not fetch AI recommendations. Please try again or proceed manually if options are available.", variant: "destructive" });
+        // Do not clear lastSuccessfulAiCallInputs here, so if they retry with same inputs it won't call AI again if it previously succeeded
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
@@ -152,16 +157,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
   const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== '';
 
-  let actionButtonText = '';
-  let actionButtonOnClick: () => void = () => {};
-  let isActionButtonDisabled = false;
-  let showWandIcon = false;
-  let showChevronIcon = false;
-
-  if (recommendationStage === 'initial') {
-    actionButtonText = 'Get Recommendations';
-    actionButtonOnClick = handleGetRecommendation;
-    isActionButtonDisabled =
+  const isProceedButtonDisabled =
       isGlobalLoading ||
       isAiLoading ||
       isPending ||
@@ -169,22 +165,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       !isPhoneValid ||
       !orderData.needsAssessment?.purpose ||
       !orderData.needsAssessment?.priorities ||
-      !orderData.needsAssessment?.region;
-    showWandIcon = true;
-  } else { // 'fetched' or 'error' stage
-    actionButtonText = 'Proceed to Select Services';
-    actionButtonOnClick = goToNextStep;
-    isActionButtonDisabled =
-      isGlobalLoading || 
-      isPending || 
-      !isEmailValid ||
-      !isPhoneValid ||
-      !orderData.needsAssessment?.purpose ||
-      !orderData.needsAssessment?.priorities ||
       !orderData.needsAssessment?.region ||
       orderData.needsAssessment?.bankingIntent === undefined;
-    showChevronIcon = true;
-  }
 
   return (
     <div className="space-y-8">
@@ -270,26 +252,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         </div>
       </div>
 
-      {aiRecommendation && (
-        <Alert variant="default" className="bg-accent/50 border-accent">
-          <Wand2 className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">AI Recommendation Received</AlertTitle>
-          <AlertDescription>
-            <p>Based on your input, we suggest considering:</p>
-            <p><strong>Jurisdiction:</strong> {aiRecommendation.jurisdiction}</p>
-            <p><strong>Company Type:</strong> {aiRecommendation.companyType}</p>
-            <p><strong>Reasoning:</strong> {aiRecommendation.reasoning}</p>
-            <p className="mt-2 text-sm">These will be considered in the next step where you select your services.</p>
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="flex justify-end items-center mt-8 pt-6 border-t">
-        <Button onClick={actionButtonOnClick} disabled={isActionButtonDisabled} className="w-full md:w-auto">
-          {(isAiLoading || (isPending && recommendationStage === 'initial')) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {showWandIcon && !isAiLoading && !(isPending && recommendationStage === 'initial') && <Wand2 className="mr-2 h-4 w-4" />}
-          {actionButtonText}
-          {showChevronIcon && <ChevronRight className="ml-2 h-4 w-4" />}
+        <Button onClick={handleGetRecommendationAndProceed} disabled={isProceedButtonDisabled} className="w-full md:w-auto">
+          {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {!isAiLoading && !isPending && <Wand2 className="mr-2 h-4 w-4" />}
+          Get Recommendations &amp; Proceed
+          {!isAiLoading && !isPending && <ChevronRight className="ml-2 h-4 w-4" />}
         </Button>
       </div>
     </div>
@@ -297,6 +265,4 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
-    
-
     

@@ -37,17 +37,14 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   const localAddons = orderData.addOns && orderData.addOns.length > 0 ? orderData.addOns : [...INITIAL_ADDONS];
 
   useEffect(() => {
-    // Ensure addons are initialized in orderData if not present
     if (!orderData.addOns || orderData.addOns.length === 0) {
       updateOrderData({ addOns: [...INITIAL_ADDONS] });
     }
-    // If AI recommended banking assistance and it's not set, apply it
     if (orderData.needsAssessment?.bankingIntent && orderData.incorporation?.reasoning && !orderData.bankingAssistance?.selected) {
-        if (orderData.bankingAssistance?.reasoning) { // check if reasoning is already set
+        if (orderData.bankingAssistance?.reasoning) {
             handleBankingAssistSelect(true, orderData.bankingAssistance.reasoning);
         }
     }
-
   }, [orderData.addOns, updateOrderData, orderData.needsAssessment?.bankingIntent, orderData.incorporation?.reasoning, orderData.bankingAssistance]);
 
   const handleIncorporationFieldChange = (field: keyof IncorporationDetails, value: string) => {
@@ -57,7 +54,6 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         [field]: value,
       }
     }));
-     // If package is already selected, update the order item description
     if (orderData.incorporation?.packageName) {
       const selectedPkg = incorporationPackages.find(pkg => pkg.name === orderData.incorporation!.packageName);
       if (selectedPkg) {
@@ -75,9 +71,9 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     const selectedPkg = incorporationPackages.find(pkg => pkg.name === packageName);
     if (selectedPkg) {
       const newIncorporationData: IncorporationDetails = {
-        jurisdiction: orderData.incorporation?.jurisdiction || '', // Keep AI or user-inputted jurisdiction
-        companyType: orderData.incorporation?.companyType || '',   // Keep AI or user-inputted company type
-        reasoning: orderData.incorporation?.reasoning || '',     // Keep AI reasoning
+        jurisdiction: orderData.incorporation?.jurisdiction || '', 
+        companyType: orderData.incorporation?.companyType || '',   
+        reasoning: orderData.incorporation?.reasoning || '',     
         packageName: selectedPkg.name,
         price: selectedPkg.price,
       };
@@ -111,17 +107,15 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     let optionToShow = orderData.bankingAssistance?.option || defaultOption;
     
     if (selected && aiReasoning && !orderData.bankingAssistance?.option) {
-        // If selecting and AI reasoning is available and no specific option already chosen by user
-        optionToShow = aiReasoning; // Use AI reasoning as the description/option
+        optionToShow = aiReasoning;
     } else if (!selected) {
-        optionToShow = ''; // Clear option if not selected
+        optionToShow = ''; 
     }
-
 
     const newBankingData: BankingAssistance = {
       ...orderData.bankingAssistance,
       selected: selected,
-      price: selected ? 250 : 0, // Assuming a fixed price for banking assistance
+      price: selected ? 250 : 0, 
       option: optionToShow,
       reasoning: selected ? (orderData.bankingAssistance?.reasoning || aiReasoning) : undefined,
     };
@@ -160,13 +154,15 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   return (
     <div className="space-y-8">
       {orderData.incorporation?.reasoning && (
-        <Alert variant="default" className="bg-accent/50 border-accent">
+        <Alert variant="default" className="bg-accent/50 border-accent mt-0">
           <Wand2 className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-primary">AI Recommendation</AlertTitle>
+          <AlertTitle className="text-primary">AI Recommendation Ready</AlertTitle>
           <AlertDescription>
+            <p>Based on your input in the previous step, we suggest considering:</p>
             <p><strong>Jurisdiction:</strong> {orderData.incorporation.jurisdiction}</p>
             <p><strong>Company Type:</strong> {orderData.incorporation.companyType}</p>
             <p><strong>Reasoning:</strong> {orderData.incorporation.reasoning}</p>
+            <p className="mt-2 text-sm">You can adjust these below or proceed with these suggestions.</p>
           </AlertDescription>
         </Alert>
       )}
@@ -251,6 +247,11 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 Note: {orderData.bankingAssistance.reasoning}
               </p>
             )}
+             {orderData.bankingAssistance?.selected && !orderData.bankingAssistance.reasoning && (
+              <p className="text-xs text-muted-foreground mt-2 p-2 bg-accent/20 rounded-md">
+                Standard banking assistance package selected.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -264,7 +265,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {localAddons.map(addon => ( // Display all addons
+            {localAddons.map(addon => ( 
               <div key={addon.id} className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors">
                 <div className="flex items-center">
                   <Switch id={addon.id} checked={addon.selected} onCheckedChange={() => handleAddonToggle(addon.id)} className="mr-3"/>
@@ -301,3 +302,4 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 };
 
 export default Step2SelectServices;
+
