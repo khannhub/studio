@@ -223,10 +223,11 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           value={orderData.userEmail || ''}
           onChange={(e) => updateOrderData({ userEmail: e.target.value })}
           className="mt-2"
+          required
         />
       </div>
       <div>
-        <Label htmlFor="phone" className="text-lg font-medium">What's your phone number? (Optional)</Label>
+        <Label htmlFor="phone" className="text-lg font-medium">What's your phone number?</Label>
         <Input
           id="phone"
           type="tel"
@@ -234,6 +235,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           value={orderData.userPhone || ''}
           onChange={(e) => updateOrderData({ userPhone: e.target.value })}
           className="mt-2"
+          required
         />
       </div>
     </div>,
@@ -394,12 +396,13 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   ];
 
   const isEmailValid = orderData.userEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderData.userEmail);
+  const isPhoneValid = orderData.userPhone && orderData.userPhone.trim() !== '';
   let isNextButtonDisabled = isLoading || isPending;
 
   if (!isNextButtonDisabled) {
     switch (currentQuestion) {
       case 0: // Email & Phone
-        isNextButtonDisabled = !isEmailValid; // Phone is optional
+        isNextButtonDisabled = !isEmailValid || !isPhoneValid;
         break;
       case 1: // Purpose
         isNextButtonDisabled = !orderData.needsAssessment?.purpose;
@@ -411,7 +414,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         isNextButtonDisabled = !orderData.needsAssessment?.region;
         break;
       case 4: // Business Description (Optional)
-        isNextButtonDisabled = false; 
+        isNextButtonDisabled = false; // Always enabled as it's optional
         break;
       case 5: // Banking Intent
         isNextButtonDisabled = orderData.needsAssessment?.bankingIntent === undefined;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { FC, ReactNode } from 'react';
@@ -33,10 +34,10 @@ const WizardLayout: FC<WizardLayoutProps> = ({
         onToggleSummary={() => setIsSummaryOpen(true)}
         orderItemCount={orderItems.filter(item => item.quantity > 0).length}
       />
-      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-3xl mx-auto">
+      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
+        <div className="max-w-3xl mx-auto flex flex-col flex-grow w-full">
           <ProgressBar currentStep={currentStep} totalSteps={totalSteps} stepNames={stepNames} />
-          <div className="mt-8 bg-card p-6 sm:p-8 rounded-xl shadow-xl">
+          <div className="mt-8 bg-card p-6 sm:p-8 rounded-xl shadow-xl flex-grow overflow-y-auto min-h-0">
             {children}
           </div>
         </div>
