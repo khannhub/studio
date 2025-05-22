@@ -83,11 +83,9 @@ export interface Address {
 
 export interface NeedsAssessment {
   region?: string;
-  businessActivities?: string[]; // Changed from purpose (string)
-  otherBusinessActivity?: string; // New field
-  strategicObjectives?: string[]; // Changed from priorities (string)
-  otherStrategicObjective?: string; // New field
-  businessDescription?: string; // Optional detailed description
+  businessActivities?: string[];
+  strategicObjectives?: string[];
+  businessDescription?: string; // Optional detailed description, also for "Other" elaborations
 }
 
 export interface OrderData {
@@ -197,5 +195,4 @@ export const INTERNATIONAL_COMPANY_TYPES_LIST = [
   'Global Business Company', 'Authorised Company', 'Limited Liability Partnership',
   'Exempted Company', 'Corporation'
 ];
-// Removed 'International investments' and 'International company' as they seemed too generic or redundant with IBC
 

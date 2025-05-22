@@ -10,14 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox'; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Wand2, ChevronRight, User, PhoneIcon, Globe, Flag, MountainSnow, Landmark as EuropeLandmark, Palmtree, Wheat, Sprout, Pyramid, Container, Users as UsersIcon, LibraryBig, Copyright, ShoppingCart, CandlestickChart, PiggyBank, Briefcase, Target, ShieldCheck, PlaneTakeoff, Coins, SlidersHorizontal, EyeOff, Banknote } from 'lucide-react';
+import { Loader2, Wand2, ChevronRight, User, PhoneIcon, Globe, Flag, MountainSnow, Landmark as EuropeLandmark, Palmtree, Wheat, Sprout, Pyramid, Container, Users as UsersIcon, LibraryBig, Copyright, ShoppingCart, CandlestickChart, PiggyBank, Briefcase, Target, ShieldCheck, PlaneTakeoff, Coins, SlidersHorizontal, EyeOff, Banknote, Search, TrendingUp } from 'lucide-react';
 import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 const regionOptions = [
   { id: 'usa_exclusive', value: 'USA (Exclusive Focus)', label: 'USA (Exclusive Focus)', icon: <Flag className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'north_america', value: 'North America', label: 'North America', icon: <MountainSnow className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'north_america', value: 'North America', label: 'North America (incl. Canada, Mexico)', icon: <MountainSnow className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'europe', value: 'Europe', label: 'Europe', icon: <EuropeLandmark className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'asia_pacific', value: 'Asia-Pacific', label: 'Asia-Pacific', icon: <Palmtree className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'south_asia', value: 'South Asia', label: 'South Asia', icon: <Wheat className="h-5 w-5 mb-2 text-primary" /> },
@@ -71,15 +71,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     }));
   }, [updateOrderData]);
 
-  const handleOtherTextChange = (field: 'otherBusinessActivity' | 'otherStrategicObjective', value: string) => {
-    updateOrderData(prev => ({
-        needsAssessment: {
-            ...(prev.needsAssessment as NeedsAssessment),
-            [field]: value,
-        }
-    }));
-  };
-
   const handleMultiSelectChange = (
     currentSelection: string[] | undefined,
     valueToToggle: string,
@@ -105,9 +96,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     const currentNeeds: Partial<NeedsAssessment> = {
       region: orderData.needsAssessment.region,
       businessActivities: orderData.needsAssessment.businessActivities,
-      otherBusinessActivity: orderData.needsAssessment.otherBusinessActivity,
       strategicObjectives: orderData.needsAssessment.strategicObjectives,
-      otherStrategicObjective: orderData.needsAssessment.otherStrategicObjective,
+      businessDescription: orderData.needsAssessment.businessDescription,
     };
     
     const inputsHaveChangedOrNoRecExists = 
@@ -127,10 +117,9 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       try {
         const aiInput: RecommendIncorporationInput = {
           businessActivities: orderData.needsAssessment?.businessActivities || [],
-          otherBusinessActivity: orderData.needsAssessment?.otherBusinessActivity,
           strategicObjectives: orderData.needsAssessment?.strategicObjectives || [],
-          otherStrategicObjective: orderData.needsAssessment?.otherStrategicObjective,
           region: orderData.needsAssessment?.region || '',
+          businessDescription: orderData.needsAssessment?.businessDescription || '',
         };
         const recommendations: RecommendIncorporationOutput = await recommendIncorporation(aiInput);
         const bestRec = recommendations.bestRecommendation;
@@ -154,7 +143,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
           if (aiInput.region === 'USA (Exclusive Focus)') {
               newIncorporationDetails.jurisdiction = 'United States of America';
-              newIncorporationDetails.state = bestRec.state;
+              newIncorporationDetails.state = bestRec.state; // AI is constrained to pick a US state
           }
           
           let updatedBankingAssistance = prev.bankingAssistance;
@@ -175,6 +164,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
         });
 
         setLastSuccessfulAiCallInputs(currentNeeds); 
+        toast({ title: "Recommendations Ready!", description: "We've generated recommendations based on your input. Proceed to Step 2 to review."});
         goToNextStep();
 
       } catch (error) {
@@ -318,18 +308,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
                  Company's main business activity? (Select all that apply)
             </Label>
             {renderMultiSelectCards(businessActivityOptions, needsAssessment.businessActivities, (value) => handleMultiSelectChange(needsAssessment.businessActivities, value, 'businessActivities'), 'businessActivities')}
-            {(needsAssessment.businessActivities || []).includes('Other Business Activity') && (
-                <div className="mt-3">
-                    <Label htmlFor="otherBusinessActivityText">Specify "Other" Business Activity:</Label>
-                    <Textarea 
-                        id="otherBusinessActivityText" 
-                        value={needsAssessment.otherBusinessActivity || ''}
-                        onChange={(e) => handleOtherTextChange('otherBusinessActivity', e.target.value)}
-                        placeholder="Describe your other business activity"
-                        className="mt-1"
-                    />
-                </div>
-            )}
           </div>
 
           <div>
@@ -337,18 +315,6 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
                  Main strategic objectives? (Select all that apply)
             </Label>
             {renderMultiSelectCards(strategicObjectiveOptions, needsAssessment.strategicObjectives, (value) => handleMultiSelectChange(needsAssessment.strategicObjectives, value, 'strategicObjectives'), 'strategicObjectives')}
-             {(needsAssessment.strategicObjectives || []).includes('Other Strategic Objective') && (
-                <div className="mt-3">
-                    <Label htmlFor="otherStrategicObjectiveText">Specify "Other" Strategic Objective:</Label>
-                    <Textarea 
-                        id="otherStrategicObjectiveText" 
-                        value={needsAssessment.otherStrategicObjective || ''}
-                        onChange={(e) => handleOtherTextChange('otherStrategicObjective', e.target.value)}
-                        placeholder="Describe your other strategic objective"
-                        className="mt-1"
-                    />
-                </div>
-            )}
           </div>
           
           <div>
@@ -357,7 +323,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             </Label>
             <Textarea
               id="businessDescription"
-              placeholder="Provide a short summary of your business activities and goals. This can help us refine our recommendations."
+              placeholder="Provide a short summary of your business activities and goals. If you selected 'Other' for business activity or objectives, please elaborate here."
               value={needsAssessment.businessDescription || ''}
               onChange={(e) => handleNeedsAssessmentChange('businessDescription', e.target.value)}
               className="mt-1 min-h-[100px]"

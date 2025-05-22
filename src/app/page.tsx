@@ -25,9 +25,7 @@ const initialOrderData: OrderData = {
   needsAssessment: {
     region: '',
     businessActivities: [],
-    otherBusinessActivity: '',
     strategicObjectives: [],
-    otherStrategicObjective: '',
     businessDescription: '',
   } as NeedsAssessment,
   incorporation: {

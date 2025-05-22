@@ -18,20 +18,13 @@ const RecommendIncorporationInputSchema = z.object({
   businessActivities: z
     .array(z.string())
     .describe('A list of main business activities of the company.'),
-  otherBusinessActivity: z
-    .string()
-    .optional()
-    .describe('Specific business activity if "Other" was selected.'),
   strategicObjectives: z
     .array(z.string())
     .describe(
       'A list of key strategic objectives for the incorporation, such as tax optimization, privacy, or ease of management.'
     ),
-  otherStrategicObjective: z
-    .string()
-    .optional()
-    .describe('Specific strategic objective if "Other" was selected.'),
   region: z.string().describe('The primary region of operation for the business. This could be "USA (Exclusive Focus)" or other international regions.'),
+  businessDescription: z.string().optional().describe('A brief description of the business activities and goals. If "Other" business activities or objectives were selected, details should be provided here.')
 });
 export type RecommendIncorporationInput = z.infer<
   typeof RecommendIncorporationInputSchema
@@ -89,17 +82,14 @@ User Inputs:
   {{#each businessActivities}}
   - {{{this}}}
   {{/each}}
-  {{#if otherBusinessActivity}}
-  - Other Activity: {{{otherBusinessActivity}}}
-  {{/if}}
   Strategic Objectives:
   {{#each strategicObjectives}}
   - {{{this}}}
   {{/each}}
-  {{#if otherStrategicObjective}}
-  - Other Objective: {{{otherStrategicObjective}}}
-  {{/if}}
   Region of Operation: {{{region}}}
+  {{#if businessDescription}}
+  Business Description (This may contain elaborations if "Other Business Activity" or "Other Strategic Objective" were selected): {{{businessDescription}}}
+  {{/if}}
 
 Available Options:
   Jurisdictions: ${jurisdictionsString}
@@ -123,6 +113,7 @@ Specific Instructions:
 3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
 4.  **Pricing**: Provide a realistic base 'price' for each of the four recommendations.
 5.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings.
+6.  **"Other" Options**: If "Other Business Activity" is present in the 'Business Activities' list, or "Other Strategic Objective" is in the 'Strategic Objectives' list, refer to the 'Business Description' field for user's elaboration on these "Other" items and incorporate this understanding into your recommendations.
 
 Generate the 'bestRecommendation' and 'alternativeRecommendations' according to the schema.
   `,
