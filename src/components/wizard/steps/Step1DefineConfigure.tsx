@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox'; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Wand2, ChevronRight, User, PhoneIcon, Globe, Flag, MountainSnow, Landmark as EuropeLandmark, Palmtree, Wheat, Sprout, Pyramid, Container, Users as UsersIcon, LibraryBig, Copyright, ShoppingCart, CandlestickChart, PiggyBank, Briefcase, Target, ShieldCheck, PlaneTakeoff, Coins, SlidersHorizontal, EyeOff, Banknote, Search, TrendingUp } from 'lucide-react';
+import { Loader2, Wand2, ChevronRight, User, PhoneIcon, Globe, Flag, MountainSnow, Landmark as EuropeLandmark, Palmtree, Wheat, Sprout, Pyramid, Container, Users as UsersIcon, LibraryBig, Copyright, ShoppingCart, CandlestickChart, PiggyBank, Briefcase, Target as TargetIcon, ShieldCheck, PlaneTakeoff, Coins, SlidersHorizontal, EyeOff, Banknote, Search, TrendingUp, Building, DollarSign } from 'lucide-react';
 import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
+import { generateRecommendationIntro, type GenerateRecommendationIntroInput, type GenerateRecommendationIntroOutput } from '@/ai/flows/generate-recommendation-intro';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -38,14 +39,14 @@ const businessActivityOptions = [
 ];
 
 const strategicObjectiveOptions = [
-  { id: 'tax_optimization', value: 'Tax Optimization / Efficiency', label: 'Tax Optimization', icon: <Target className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'tax_optimization', value: 'Tax Optimization / Efficiency', label: 'Tax Optimization', icon: <TargetIcon className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'asset_protection', value: 'Asset Protection / Risk Mitigation', label: 'Asset Protection', icon: <ShieldCheck className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'market_access_trade', value: 'Global Market Access / Trade', label: 'Market Access/Trade', icon: <PlaneTakeoff className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'investment_centralization', value: 'Investment Centralization', label: 'Investment Hub', icon: <Coins className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'admin_simplification', value: 'Administrative Simplification', label: 'Admin Simplicity', icon: <SlidersHorizontal className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'privacy_confidentiality', value: 'Privacy & Confidentiality', label: 'Privacy', icon: <EyeOff className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'access_banking', value: 'Access Specific Banking', label: 'Banking Access', icon: <Banknote className="h-5 w-5 mb-2 text-primary" /> },
-  { id: 'other_objective', value: 'Other Strategic Objective', label: 'Other Objective', icon: <Briefcase className="h-5 w-5 mb-2 text-primary" /> },
+  { id: 'other_objective', value: 'Other Strategic Objective', label: 'Other Objective', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
 ];
 
 
@@ -106,6 +107,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       JSON.stringify(lastSuccessfulAiCallInputs) !== JSON.stringify(currentNeeds);
 
     if (!inputsHaveChangedOrNoRecExists) {
+      // Skip AI calls if inputs haven't changed and recommendations exist
       goToNextStep();
       return;
     }
@@ -115,13 +117,21 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
     
     startTransition(async () => {
       try {
-        const aiInput: RecommendIncorporationInput = {
+        const recInput: RecommendIncorporationInput = {
           businessActivities: orderData.needsAssessment?.businessActivities || [],
           strategicObjectives: orderData.needsAssessment?.strategicObjectives || [],
           region: orderData.needsAssessment?.region || '',
           businessDescription: orderData.needsAssessment?.businessDescription || '',
         };
-        const recommendations: RecommendIncorporationOutput = await recommendIncorporation(aiInput);
+        const recommendations: RecommendIncorporationOutput = await recommendIncorporation(recInput);
+        
+        const introInput: GenerateRecommendationIntroInput = {
+          region: orderData.needsAssessment?.region,
+          businessActivities: orderData.needsAssessment?.businessActivities,
+          strategicObjectives: orderData.needsAssessment?.strategicObjectives,
+        };
+        const intro: GenerateRecommendationIntroOutput = await generateRecommendationIntro(introInput);
+
         const bestRec = recommendations.bestRecommendation;
         
         updateOrderData(prev => {
@@ -139,37 +149,27 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             aiRecommendedState: bestRec.state,
             aiRecommendedCompanyType: bestRec.companyType,
             aiRecommendedReasoning: bestRec.reasoning,
+            aiGeneratedIntroText: intro.introText,
           };
 
-          if (aiInput.region === 'USA (Exclusive Focus)') {
+          if (recInput.region === 'USA (Exclusive Focus)') {
               newIncorporationDetails.jurisdiction = 'United States of America';
-              newIncorporationDetails.state = bestRec.state; // AI is constrained to pick a US state
-          }
-          
-          let updatedBankingAssistance = prev.bankingAssistance;
-          if (prev.bankingAssistance?.selected) { 
-            const recStateDisplay = newIncorporationDetails.state ? ` (${newIncorporationDetails.state.split('-')[0]})` : '';
-            const bankingReasoning = `We suggest considering banking options suitable for ${newIncorporationDetails.jurisdiction}${recStateDisplay} (${newIncorporationDetails.companyType}).`;
-            updatedBankingAssistance = {
-                ...prev.bankingAssistance,
-                reasoning: bankingReasoning,
-            };
+              newIncorporationDetails.state = bestRec.state; 
           }
           
           return {
             ...prev,
             incorporation: newIncorporationDetails,
-            bankingAssistance: updatedBankingAssistance,
           };
         });
 
         setLastSuccessfulAiCallInputs(currentNeeds); 
-        toast({ title: "Recommendations Ready!", description: "We've generated recommendations based on your input. Proceed to Step 2 to review."});
+        toast({ title: "Recommendations Ready!", description: "We've prepared recommendations. Proceed to the next step to review."});
         goToNextStep();
 
       } catch (error) {
-        console.error("Error getting recommendation:", error);
-        toast({ title: "Recommendation Failed", description: "Could not fetch recommendations. Please try again or ensure all fields are completed.", variant: "destructive" });
+        console.error("Error during recommendation process:", error);
+        toast({ title: "Recommendation Failed", description: "Could not process recommendations. Please check your input or try again.", variant: "destructive" });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);

@@ -33,6 +33,7 @@ export interface IncorporationDetails {
   aiRecommendedState?: string;
   aiRecommendedCompanyType?: string;
   aiRecommendedReasoning?: string;
+  aiGeneratedIntroText?: string; // For the intro text in Step 2
 }
 
 export interface AddOn {
@@ -41,6 +42,9 @@ export interface AddOn {
   selected: boolean;
   price: number; // Actual price, "From $" is a display format
   description?: string; // Optional: for more details in accordion
+  // Fields for banking assistance if merged
+  preferredCurrency?: string;
+  preferredBankingRegion?: string;
 }
 
 export interface CompanyNameChoices {
@@ -80,7 +84,7 @@ export interface NeedsAssessment {
   region?: string;
   businessActivities?: string[];
   strategicObjectives?: string[];
-  businessDescription?: string; // Optional: for "Other" elaborations or general description
+  businessDescription?: string; 
 }
 
 export interface OrderData {
