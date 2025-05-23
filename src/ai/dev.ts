@@ -5,5 +5,6 @@ config();
 import '@/ai/flows/summarize-business-description.ts';
 import '@/ai/flows/recommend-incorporation.ts';
 import '@/ai/flows/prefill-company-details.ts';
+import '@/ai/flows/generate-recommendation-intro.ts';
 
     
