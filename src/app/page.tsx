@@ -37,13 +37,7 @@ const initialOrderData: OrderData = {
     aiRecommendedCompanyType: '',
     aiRecommendedReasoning: '',
   },
-  bankingAssistance: {
-    selected: false,
-    option: '',
-    price: 0,
-    reasoning: '',
-  },
-  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })),
+  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })), // Banking assistance is now part of addOns
   companyNames: { firstChoice: '', secondChoice: '', thirdChoice: '' },
   directors: [{ id: `dir-${Date.now()}`, fullName: '', email: '' }],
   shareholders: [{ id: `sh-${Date.now()}`, fullNameOrEntityName: '', shareAllocation: '' }],
@@ -75,9 +69,7 @@ export default function WizardPage() {
       if (newPartialData.incorporation) {
         updatedData.incorporation = { ...prev.incorporation, ...newPartialData.incorporation };
       }
-      if (newPartialData.bankingAssistance) {
-        updatedData.bankingAssistance = { ...prev.bankingAssistance, ...newPartialData.bankingAssistance };
-      }
+      // BankingAssistance is removed as a top-level field
       if (newPartialData.needsAssessment) {
         updatedData.needsAssessment = { ...prev.needsAssessment, ...newPartialData.needsAssessment };
       }
@@ -107,7 +99,7 @@ export default function WizardPage() {
 
   useEffect(() => {
     const items: OrderItem[] = [];
-    const { incorporation, bankingAssistance, addOns, needsAssessment } = orderData;
+    const { incorporation, addOns, needsAssessment } = orderData;
 
     if (incorporation?.jurisdiction && incorporation.companyType && incorporation.price !== undefined) {
       let name = `${incorporation.jurisdiction}`;
@@ -127,7 +119,7 @@ export default function WizardPage() {
 
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationPrice += pkg.price;
+          totalIncorporationPrice += pkg.price; // Package price is added to base incorporation price
           description += ` Includes ${incorporation.packageName} features. Recommended for your needs.`;
         }
       }
@@ -143,25 +135,17 @@ export default function WizardPage() {
       }
     }
 
-    if (bankingAssistance?.selected && bankingAssistance.price && bankingAssistance.price > 0) {
-      items.push({
-        id: 'banking_assistance',
-        name: 'Banking Assistance',
-        price: bankingAssistance.price,
-        quantity: 1,
-        description: bankingAssistance.option || `Access to banking partners. ${bankingAssistance.reasoning ? 'Reasoning: '+bankingAssistance.reasoning.substring(0,100)+'...' : ''}`.trim(),
-      });
-    }
+    // Banking assistance is now handled like other add-ons
     addOns?.forEach(addon => {
       if (addon.selected && addon.price > 0) {
-        items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.name} service.` });
+        items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.description || addon.name + ' service.'}` });
       }
     });
 
     setDerivedOrderItems(items);
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
-  }, [orderData.incorporation, orderData.bankingAssistance, orderData.addOns, orderData.needsAssessment?.region]);
+  }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region]);
 
 
   const addOrderItemHandler = useCallback((item: OrderItem) => {
@@ -193,18 +177,15 @@ export default function WizardPage() {
   const removeOrderItemHandler = useCallback((itemId: string) => {
     setOrderData(prevData => {
         const newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
-        let updatedBankingAssistance = prevData.bankingAssistance;
-        if (itemId === 'banking_assistance') {
-          updatedBankingAssistance = { ...prevData.bankingAssistance, selected: false, price: 0 };
-        }
+        // No longer need special handling for bankingAssistance here
 
         let updatedAddOns = prevData.addOns;
-        if (itemId !== 'banking_assistance' && itemId !== 'incorporation_service') {
+        if (itemId !== 'incorporation_service') { // Check if it's an add-on
              updatedAddOns = (prevData.addOns || []).map(addon =>
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );
         }
-        return { ...prevData, orderItems: newItems, bankingAssistance: updatedBankingAssistance, addOns: updatedAddOns };
+        return { ...prevData, orderItems: newItems, addOns: updatedAddOns };
     });
   }, []);
 

@@ -28,17 +28,11 @@ export interface IncorporationDetails {
   aiBestRecommendation?: IncorporationRecommendationItem | null;
   aiAlternativeRecommendations?: IncorporationRecommendationItem[];
 
+  // Storing the AI's direct recommendation separately
   aiRecommendedJurisdiction?: string;
   aiRecommendedState?: string;
   aiRecommendedCompanyType?: string;
   aiRecommendedReasoning?: string;
-}
-
-export interface BankingAssistance {
-  selected?: boolean;
-  option?: string;
-  price?: number;
-  reasoning?: string;
 }
 
 export interface AddOn {
@@ -46,6 +40,7 @@ export interface AddOn {
   name: string;
   selected: boolean;
   price: number;
+  description?: string; // Optional: for more details in accordion
 }
 
 export interface CompanyNameChoices {
@@ -85,7 +80,7 @@ export interface NeedsAssessment {
   region?: string;
   businessActivities?: string[];
   strategicObjectives?: string[];
-  businessDescription?: string; // Optional detailed description, also for "Other" elaborations
+  businessDescription?: string; // Optional: for "Other" elaborations or general description
 }
 
 export interface OrderData {
@@ -93,7 +88,6 @@ export interface OrderData {
   userPhone?: string;
   needsAssessment?: NeedsAssessment;
   incorporation?: IncorporationDetails;
-  bankingAssistance?: BankingAssistance;
   addOns?: AddOn[];
 
   companyNames?: CompanyNameChoices;
@@ -141,10 +135,11 @@ export const STEPS = [
 ];
 
 export const INITIAL_ADDONS: AddOn[] = [
-  { id: 'nominee_director', name: 'Nominee Director', selected: false, price: 500 },
-  { id: 'nominee_shareholder', name: 'Nominee Shareholder', selected: false, price: 400 },
-  { id: 'mail_forwarding', name: 'Mail Forwarding & Virtual Office', selected: false, price: 350 },
-  { id: 'accounting_services', name: 'Annual Accounting Services', selected: false, price: 750 },
+  { id: 'banking_assistance', name: 'Banking Assistance', selected: false, price: 250, description: "Dedicated support for opening a bank account with our partner institutions." },
+  { id: 'nominee_director', name: 'Nominee Director', selected: false, price: 500, description: "Appoint a professional director to fulfill statutory requirements and enhance privacy." },
+  { id: 'nominee_shareholder', name: 'Nominee Shareholder', selected: false, price: 400, description: "Utilize a nominee shareholder to hold shares on your behalf, maintaining confidentiality." },
+  { id: 'mail_forwarding', name: 'Mail Forwarding & Virtual Office', selected: false, price: 350, description: "Receive and forward your company's mail to an address of your choice. Includes a prestigious business address." },
+  { id: 'accounting_services', name: 'Annual Accounting Services', selected: false, price: 750, description: "Comprehensive accounting and bookkeeping services to ensure your company remains compliant." },
 ];
 
 export const JURISDICTIONS_LIST = [
@@ -195,4 +190,3 @@ export const INTERNATIONAL_COMPANY_TYPES_LIST = [
   'Global Business Company', 'Authorised Company', 'Limited Liability Partnership',
   'Exempted Company', 'Corporation'
 ];
-
