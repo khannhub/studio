@@ -40,7 +40,7 @@ const SingleRecommendationSchema = z.object({
   reasoning: z
     .string()
     .describe('The reasoning behind this specific recommendation (jurisdiction, state if applicable, company type). Use markdown bold syntax (**text**) to highlight the most important phrases or key ideas. For the "bestRecommendation", provide more detailed reasoning (3-4 sentences). For "alternativeRecommendations", keep reasoning concise (2-3 sentences). Maintain a formal and business-targeted tone.'),
-  price: z.number().int().min(100).max(5000).describe('A base price (integer between 100 and 5000 USD) for setting up this specific incorporation (jurisdiction and company type). Example: 1299.'),
+  price: z.number().int().min(100).max(1000).describe('A base price (integer between 100 and 1000 USD) for setting up this specific incorporation (jurisdiction, state if applicable, and company type). Example: 499.'), // Adjusted price range
 });
 
 const RecommendIncorporationOutputSchema = z.object({
@@ -57,6 +57,7 @@ export async function recommendIncorporation(
   input: RecommendIncorporationInput
 ): Promise<RecommendIncorporationOutput> {
   const result = await recommendIncorporationFlow(input);
+  // Ensure the best pick has the flag, and others don't
   return {
       ...result,
       bestRecommendation: { ...result.bestRecommendation, isBestPick: true } as IncorporationRecommendationItem,
@@ -65,7 +66,7 @@ export async function recommendIncorporation(
 }
 
 const jurisdictionsString = JURISDICTIONS_LIST.join(', ');
-const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; ');
+const usStatesString = US_STATES_LIST.map(s => `${s.label}-${s.value.split('-')[1]}`).join('; '); // Format for AI prompt
 const usCompanyTypesString = US_COMPANY_TYPES_LIST.join(', ');
 const intlCompanyTypesString = INTERNATIONAL_COMPANY_TYPES_LIST.join(', ');
 
@@ -103,8 +104,8 @@ Output Structure for EACH recommendation (bestRecommendation and each of the 3 a
   -   'state': (Optional) If 'jurisdiction' is "United States of America", MUST recommend a 'state' from the 'US States' list (e.g., "Delaware-DE"). If region is 'USA (Exclusive Focus)', a state MUST be recommended. Otherwise, omit 'state' unless "United States of America" is chosen as jurisdiction.
   -   'companyType': If 'jurisdiction' is "United States of America", MUST be chosen from 'US Company Types'. Otherwise, MUST be chosen from 'International Company Types'. If region is 'USA (Exclusive Focus)', companyType MUST be from 'US Company Types'.
   -   'shortDescription': A very brief (10-15 words) tagline or key feature summary for this specific recommendation.
-  -   'reasoning': For the 'bestRecommendation', provide comprehensive reasoning (3-4 sentences). For 'alternativeRecommendations', provide concise reasoning (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure reasoning is formal and business-targeted.
-  -   'price': An estimated base price (integer between 100 and 5000 USD) for this specific incorporation. Example: 1299.
+  -   'reasoning': For the 'bestRecommendation', provide comprehensive reasoning (3-4 sentences). For 'alternativeRecommendations', provide concise reasoning (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure reasoning is formal and business-like.
+  -   'price': An estimated base price (integer between 100 and 1000 USD) for this specific incorporation. Example: 499. This price is for the core incorporation service only, before any packages or government fees.
 
 Specific Instructions:
 1.  **Primary Region "USA (Exclusive Focus)"**:
@@ -114,7 +115,7 @@ Specific Instructions:
 2.  **Other Primary Regions**:
     *   If 'Region of Operation' is not "USA (Exclusive Focus)", you can recommend any suitable jurisdiction from the 'Jurisdictions' list for all recommendations, including "United States of America" (with a state and US company type) if it's a strong strategic fit. The 'bestRecommendation' can be any suitable jurisdiction.
 3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
-4.  **Pricing**: Provide a realistic base 'price' for each of the four recommendations.
+4.  **Pricing**: Provide a realistic base 'price' (between 100 and 1000 USD) for each of the four recommendations.
 5.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure the tone is formal and business-like.
 6.  **"Other" Options**: If "Other Business Activity" is present in the 'Business Activities' list, or "Other Strategic Objective" is in the 'Strategic Objectives' list, refer to the 'Business Description' field for user's elaboration on these "Other" items and incorporate this understanding into your recommendations.
 
