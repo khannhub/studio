@@ -2,9 +2,9 @@
 'use client';
 
 import type { FC } from 'react';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useTransition } from 'react';
 import type { StepComponentProps, IncorporationRecommendationItem, IncorporationDetails, OrderData } from '@/lib/types';
-import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, CUSTOM_INCORP_BASE_PRICE, USA_STATE_FEE, INTERNATIONAL_GOVERNMENT_FEE } from '@/lib/types';
+import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, CUSTOM_INCORP_BASE_PRICE } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { prefillCompanyDetails, type PrefillCompanyDetailsInput, type PrefillCompanyDetailsOutput } from '@/ai/flows/prefill-company-details';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge'; // Ensure Badge is imported
+import { Badge } from '@/components/ui/badge';
 
 // Fixed prices for USA packages
 export const incorporationPackages = [
@@ -37,6 +37,7 @@ const assignStaticPriceToManualConfig = (jurisdiction?: string, state?: string, 
     if (!jurisdiction || !companyType) return CUSTOM_INCORP_BASE_PRICE;
     if (jurisdiction === 'United States of America' && !state) return CUSTOM_INCORP_BASE_PRICE;
 
+    // This function should mirror the logic used in Step1DefineConfigure's assignStaticPriceToRecommendation
     if (jurisdiction === 'United States of America') {
         if (state === 'Delaware-DE' && companyType === 'Limited Liability Company') return 199;
         if (state === 'Wyoming-WY' && companyType === 'Limited Liability Company') return 149;
@@ -47,7 +48,7 @@ const assignStaticPriceToManualConfig = (jurisdiction?: string, state?: string, 
     if (jurisdiction === 'British Virgin Islands' && companyType === 'International Business Company') return 799;
     if (jurisdiction === 'Hong Kong' && companyType === 'Limited by Shares') return 650;
     
-    return CUSTOM_INCORP_BASE_PRICE; // Default for other custom international
+    return 250; // Default for other custom international or unmapped US
 };
 
 
@@ -106,22 +107,23 @@ const Step2SelectServices: FC<StepComponentProps> = ({
     if (hasValidIncorporationSelection) {
         const key = `${currentJurisdiction}-${currentState || 'none'}-${currentCompanyType}`;
         setSelectedIncorporationKey(key);
-        if (!currentPackageName && displayedPackages.length > 0) {
+         if (!currentPackageName && displayedPackages.length > 0) {
              updateOrderData(prev => ({
                 incorporation: {
                     ...prev.incorporation,
-                    packageName: displayedPackages[Math.floor(displayedPackages.length / 2)].name,
+                    packageName: displayedPackages[Math.floor(displayedPackages.length / 2)].name, // Default to middle package
                 } as IncorporationDetails
             }));
         }
     } else if (aiBestRec && !currentJurisdiction && !currentState && !currentCompanyType ) { 
+        // If no user selection but AI best pick exists, apply it
         updateOrderData(prev => ({
             incorporation: {
                 ...prev.incorporation,
                 jurisdiction: aiBestRec.jurisdiction,
                 state: aiBestRec.state,
                 companyType: aiBestRec.companyType,
-                price: aiBestRec.price,
+                price: aiBestRec.price, // This is now the static price assigned in Step 1
                 packageName: prev.incorporation?.packageName || (displayedPackages.length > 0 ? displayedPackages[Math.floor(displayedPackages.length / 2)].name : undefined),
             } as IncorporationDetails
         }));
@@ -218,7 +220,6 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             addon.id === addonId ? { ...addon, selected } : addon
         )
     }));
-     // Toggle accordion item for this add-on
     setOpenAddonAccordionItems(prevOpen => {
       if (selected && !prevOpen.includes(addonId)) {
         return [...prevOpen, addonId];
@@ -317,19 +318,15 @@ const Step2SelectServices: FC<StepComponentProps> = ({
                 isBest ? "md:col-span-3 p-6" : "md:col-span-1 p-4" 
             )}
         >
-            <CardHeader className={cn("pb-2 pt-0 px-0", isBest ? "mb-2" : "mb-1")}>
+            <CardHeader className={cn("pb-2 pt-0 px-0 flex-row justify-between items-start", isBest ? "mb-2" : "mb-1")}>
                 <CardTitle className={cn("leading-tight", isBest ? "text-xl md:text-2xl" : "text-lg")}> 
                     {title}
                 </CardTitle>
-                {rec.isBestPick && (
-                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-bl-lg shadow-md z-10">
-                        Our Top Pick
-                    </div>
-                )}
+                {rec.isBestPick && <Badge variant="default" className="absolute top-3 right-3 bg-primary text-primary-foreground">Our Top Pick</Badge>}
             </CardHeader>
             <CardContent className={cn("space-y-2 flex-grow px-0", isBest ? "pb-16" : "pb-12")}>
                 <p className="italic text-muted-foreground text-sm" dangerouslySetInnerHTML={{ __html: `${(rec.reasoning || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}` }} />
-                <div className={cn(
+                 <div className={cn(
                     "absolute bottom-3 right-3 font-bold text-primary",
                     isBest ? "text-xl" : "text-lg" 
                 )}>
@@ -355,66 +352,68 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             </div>
         )}
         
-        <Accordion type="single" collapsible className="w-full" value={manualConfigAccordionValue} onValueChange={setManualConfigAccordionValue}>
-            <AccordionItem value="manual-config" className="border-b-0">
-                <AccordionTrigger className="hover:no-underline py-3 text-base font-medium text-muted-foreground data-[state=open]:text-primary data-[state=open]:font-semibold">
-                    <div className="flex items-center space-x-2 w-full">
-                        <Settings className="h-5 w-5"/>
-                        <span>Customize Your Incorporation</span>
-                    </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 pb-4 space-y-4">
-                    <p className="text-sm text-muted-foreground">Fine-tune your selection or choose a different combination.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4 items-end">
-                        {!isPrimaryRegionUSA && (
-                            <div className="md:col-span-1">
-                                <Label htmlFor="jurisdiction">Jurisdiction</Label>
-                                <Select
-                                    value={orderData.incorporation?.jurisdiction || ''}
-                                    onValueChange={(value) => handleManualIncorporationChange('jurisdiction', value)}
-                                >
-                                    <SelectTrigger id="jurisdiction" className="w-full mt-1"><SelectValue placeholder="Select Jurisdiction" /></SelectTrigger>
-                                    <SelectContent>{JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        )}
-
-                        {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
-                             <div className={cn("md:col-span-1", isPrimaryRegionUSA && !orderData.incorporation?.jurisdiction ? "hidden" : "")}> {/* Simplified hidden logic */}
-                                <Label htmlFor="state">State</Label>
-                                <Select
-                                    value={orderData.incorporation?.state || ''}
-                                    onValueChange={(value) => handleManualIncorporationChange('state', value)}
-                                    disabled={!isPrimaryRegionUSA && orderData.incorporation?.jurisdiction !== 'United States of America'}
-                                >
-                                    <SelectTrigger id="state" className="w-full mt-1"><SelectValue placeholder="Select State" /></SelectTrigger>
-                                    <SelectContent>{US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        )}
-
-                         <div className={cn("md:col-span-1", isPrimaryRegionUSA ? "" : (orderData.incorporation?.jurisdiction ? "" : "md:col-span-2"))}>
-                            <Label htmlFor="companyType">Company Type</Label>
-                            <Select
-                                value={orderData.incorporation?.companyType || ''}
-                                onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
-                                disabled={
-                                    (!orderData.incorporation?.jurisdiction) ||
-                                    ((isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && !orderData.incorporation?.state)}
-                            >
-                                <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
-                                <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
-                            </Select>
+        <div className="space-y-3 pt-2"> {/* No border-b for accordion */}
+            <Accordion type="single" collapsible className="w-full" value={manualConfigAccordionValue} onValueChange={setManualConfigAccordionValue}>
+                <AccordionItem value="manual-config" className="border-b-0">
+                    <AccordionTrigger className="hover:no-underline py-3 text-base font-medium text-muted-foreground data-[state=open]:text-primary data-[state=open]:font-semibold">
+                        <div className="flex items-center space-x-2 w-full">
+                            <Settings className="h-5 w-5"/>
+                            <span>Customize Your Incorporation</span>
                         </div>
-                         {orderData.incorporation?.price !== undefined && orderData.incorporation?.jurisdiction && orderData.incorporation.companyType && (isPrimaryRegionUSA || orderData.incorporation.jurisdiction === 'United States of America' ? orderData.incorporation.state : true) && (
-                            <div className="text-primary font-semibold text-lg md:col-span-2 md:text-right">
-                                Base Price: ${orderData.incorporation.price}
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 pb-4 space-y-4">
+                        <p className="text-sm text-muted-foreground">Fine-tune your selection or choose a different combination.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4 items-end">
+                            {!isPrimaryRegionUSA && (
+                                <div className="md:col-span-1">
+                                    <Label htmlFor="jurisdiction">Jurisdiction</Label>
+                                    <Select
+                                        value={orderData.incorporation?.jurisdiction || ''}
+                                        onValueChange={(value) => handleManualIncorporationChange('jurisdiction', value)}
+                                    >
+                                        <SelectTrigger id="jurisdiction" className="w-full mt-1"><SelectValue placeholder="Select Jurisdiction" /></SelectTrigger>
+                                        <SelectContent>{JURISDICTIONS_LIST.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                            {(isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && (
+                                <div className="md:col-span-1">
+                                    <Label htmlFor="state">State</Label>
+                                    <Select
+                                        value={orderData.incorporation?.state || ''}
+                                        onValueChange={(value) => handleManualIncorporationChange('state', value)}
+                                        disabled={!isPrimaryRegionUSA && orderData.incorporation?.jurisdiction !== 'United States of America'}
+                                    >
+                                        <SelectTrigger id="state" className="w-full mt-1"><SelectValue placeholder="Select State" /></SelectTrigger>
+                                        <SelectContent>{US_STATES_LIST.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                            <div className={cn("md:col-span-1", isPrimaryRegionUSA && orderData.incorporation?.jurisdiction === 'United States of America' ? "" : (orderData.incorporation?.jurisdiction ? "" : "md:col-span-2"))}>
+                                <Label htmlFor="companyType">Company Type</Label>
+                                <Select
+                                    value={orderData.incorporation?.companyType || ''}
+                                    onValueChange={(value) => handleManualIncorporationChange('companyType', value)}
+                                    disabled={
+                                        (!orderData.incorporation?.jurisdiction) ||
+                                        ((isPrimaryRegionUSA || orderData.incorporation?.jurisdiction === 'United States of America') && !orderData.incorporation?.state)}
+                                >
+                                    <SelectTrigger id="companyType" className="w-full mt-1"><SelectValue placeholder="Select Company Type" /></SelectTrigger>
+                                    <SelectContent>{currentCompanyTypes.map(ct => <SelectItem key={ct} value={ct}>{ct}</SelectItem>)}</SelectContent>
+                                </Select>
                             </div>
-                        )}
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+                            {orderData.incorporation?.price !== undefined && orderData.incorporation?.jurisdiction && orderData.incorporation.companyType && (isPrimaryRegionUSA || orderData.incorporation.jurisdiction === 'United States of America' ? orderData.incorporation.state : true) && (
+                                <div className="text-primary font-semibold text-lg md:col-span-2 md:text-right">
+                                    Base Price: ${orderData.incorporation.price}
+                                </div>
+                            )}
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+        </div>
         
         {orderData.incorporation?.jurisdiction && (
             <div className="py-4 space-y-3">
@@ -455,7 +454,7 @@ const Step2SelectServices: FC<StepComponentProps> = ({
             <Accordion type="multiple" className="w-full space-y-2" value={openAddonAccordionItems} onValueChange={setOpenAddonAccordionItems}>
                 {(orderData.addOns || []).map(addon => (
                 <AccordionItem key={addon.id} value={addon.id} className="border rounded-md overflow-hidden">
-                    <AccordionTrigger className="p-4 hover:no-underline flex justify-between items-center w-full text-base font-medium">
+                     <AccordionTrigger className="p-4 hover:no-underline flex justify-between items-center w-full text-base font-medium">
                         <span className="mr-auto text-left">{addon.name}</span>
                          <div className="flex items-center shrink-0 ml-2">
                             <span className="text-primary font-semibold mr-3">From ${addon.price}</span>
@@ -518,4 +517,3 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 };
 
 export default Step2SelectServices;
-
