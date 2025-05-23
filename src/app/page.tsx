@@ -10,7 +10,7 @@ import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
 import type { OrderData, OrderItem, IncorporationRecommendationItem, NeedsAssessment } from '@/lib/types';
-import { STEPS, INITIAL_ADDONS, USA_STATE_FEE, INTERNATIONAL_GOVERNMENT_FEE } from '@/lib/types';
+import { STEPS, INITIAL_ADDONS, USA_STATE_FEE, INTERNATIONAL_GOVERNMENT_FEE, US_STATES_LIST } from '@/lib/types';
 
 
 const initialOrderData: OrderData = {
@@ -102,36 +102,37 @@ export default function WizardPage() {
     let governmentFeeAdded = false;
 
     if (incorporation?.jurisdiction && incorporation.companyType && (isUsaFocus || incorporation.jurisdiction !== 'United States of America' || incorporation.state)) {
-      let name = `${incorporation.jurisdiction}`;
+      let incName = `${incorporation.jurisdiction}`;
       if (incorporation.jurisdiction === 'United States of America' && incorporation.state) {
         const stateLabel = US_STATES_LIST.find(s => s.value === incorporation.state)?.label || incorporation.state.split('-')[0];
-        name += ` (${stateLabel})`;
+        incName += ` (${stateLabel})`;
       }
-      name += ` ${incorporation.companyType}`;
+      incName += ` ${incorporation.companyType} Formation`;
+      
+      // Add the main incorporation service item (base price only)
+      items.push({
+        id: 'incorporation_service',
+        name: incName,
+        price: incorporation.price || 0, // Base price from selection
+        quantity: 1,
+        description: `Base service for company formation in ${incorporation.jurisdiction}.`,
+      });
 
-      let totalIncorporationServicePrice = incorporation.price || 0; // Base price
-      let description = `Formation in ${incorporation.jurisdiction}.`;
-
+      // Add Package/Processing Time as a separate item
       if (incorporation.packageName) {
         const activePackages = isUsaFocus ? usaPackages : intlPackages;
         const pkg = activePackages.find(p => p.name === incorporation.packageName);
-
         if (pkg) {
-          name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationServicePrice += pkg.price; // Package price is added to base incorporation price
-          description += ` Includes ${incorporation.packageName} features.`;
+          items.push({
+            id: 'incorporation_package_tier',
+            name: `${incorporation.packageName} ${isUsaFocus ? 'Package' : 'Processing'}`,
+            price: pkg.price,
+            quantity: 1,
+            description: pkg.features.join('; '),
+          });
         }
       }
       
-      // Add the main incorporation service item
-      items.push({
-        id: 'incorporation_service',
-        name: name,
-        price: totalIncorporationServicePrice,
-        quantity: 1,
-        description: description.trim(),
-      });
-
       // Add Government/State Fees conditionally
       const feePrice = isUsaFocus || incorporation.jurisdiction === 'United States of America' ? USA_STATE_FEE : INTERNATIONAL_GOVERNMENT_FEE;
       const feeName = isUsaFocus || incorporation.jurisdiction === 'United States of America' ? 'State Fees (USA)' : 'Government Fees';
@@ -147,13 +148,11 @@ export default function WizardPage() {
 
 
     addOns?.forEach(addon => {
-      if (addon.selected) { // Price check removed, assuming selected add-ons will always have a price or 0
+      if (addon.selected) { 
         items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.description || addon.name + ' service.'}` });
       }
     });
     
-    // If government fees were not added because incorporation details were incomplete,
-    // but an old item exists, remove it.
     if (!governmentFeeAdded) {
         const feeIndex = items.findIndex(item => item.id === 'government_fees');
         if (feeIndex > -1) {
@@ -161,11 +160,7 @@ export default function WizardPage() {
         }
     }
 
-
     setDerivedOrderItems(items);
-    // Update orderData.orderItems directly to ensure consistency if needed by other parts
-    // This might be slightly redundant if derivedOrderItems is always the source of truth for display
-    // but ensures orderData is complete.
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region]);
@@ -198,22 +193,23 @@ export default function WizardPage() {
 
 
   const removeOrderItemHandler = useCallback((itemId: string) => {
-    setOrderData(prevData => {
+    updateOrderData(prevData => {
         let newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
         let updatedAddOns = prevData.addOns;
+        let updatedIncorporation = prevData.incorporation;
 
-        // If the main incorporation service is removed, also remove government fees
         if (itemId === 'incorporation_service') {
-            newItems = newItems.filter(item => item.id !== 'government_fees');
+            // If main incorporation service is removed, also remove government fees and package/tier
+            newItems = newItems.filter(item => item.id !== 'government_fees' && item.id !== 'incorporation_package_tier');
+            updatedIncorporation = { ...prevData.incorporation, packageName: undefined }; // Clear package selection
         }
         
-        // If an add-on is removed from the cart, unselect it in the addOns array
-        if (itemId !== 'incorporation_service' && itemId !== 'government_fees') {
+        if (itemId !== 'incorporation_service' && itemId !== 'government_fees' && itemId !== 'incorporation_package_tier') {
              updatedAddOns = (prevData.addOns || []).map(addon =>
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );
         }
-        return { ...prevData, orderItems: newItems, addOns: updatedAddOns };
+        return { ...prevData, orderItems: newItems, addOns: updatedAddOns, incorporation: updatedIncorporation };
     });
   }, []);
 
@@ -277,3 +273,4 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
+

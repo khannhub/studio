@@ -19,7 +19,7 @@ const GenerateRecommendationIntroInputSchema = z.object({
 export type GenerateRecommendationIntroInput = z.infer<typeof GenerateRecommendationIntroInputSchema>;
 
 const GenerateRecommendationIntroOutputSchema = z.object({
-  introText: z.string().describe("A short, user-focused introductory sentence for the recommendations section (1-2 sentences, max 35 words)."),
+  introText: z.string().describe("A short, user-focused, formal introductory sentence for the recommendations section (1-2 sentences, max 35 words). It should not give user instructions or end with a colon."),
 });
 export type GenerateRecommendationIntroOutput = z.infer<typeof GenerateRecommendationIntroOutputSchema>;
 
@@ -36,14 +36,15 @@ const prompt = ai.definePrompt({
 {{#if businessActivities}}Business Activities: {{#each businessActivities}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if strategicObjectives}}Strategic Objectives: {{#each strategicObjectives}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 
-Generate a short, friendly introductory sentence (1-2 sentences, max 35 words) to display before showing company incorporation recommendations. This sentence should briefly acknowledge their main focus areas if provided.
-Examples:
-- "Considering your focus on {{#if businessActivities}}{{businessActivities.[0]}}{{else}}your venture{{/if}} in {{#if region}}{{{region}}}{{else}}your chosen market{{/if}}, here are some tailored incorporation options:"
-- "For your business aiming for {{#if strategicObjectives}}{{strategicObjectives.[0]}}{{else}}growth{{/if}}{{#if region}} in {{{region}}}{{/if}}, we've prepared these recommendations:"
-- "Here are some incorporation options based on your stated needs and objectives:"
-
-The tone should be helpful, professional, and avoid mentioning "AI". Use "we've prepared", "tailored for you", or similar phrasing. Focus on making the user feel understood.
+Generate a short, friendly, and formal introductory sentence (1-2 sentences, max 35 words) to display before showing company incorporation recommendations. This sentence should briefly acknowledge their main focus areas if provided.
+Do not provide instructions to the user (e.g., 'click a card') and do not end the sentence with a colon.
+The tone should be professional, helpful, and business-targeted, avoiding mentions of "AI". Use "we've prepared", "tailored for you", or similar phrasing.
 Provide only the introductory sentence.
+
+Examples:
+- "Considering your focus on {{#if businessActivities}}{{businessActivities.[0]}}{{else}}your venture{{/if}} in {{#if region}}{{{region}}}{{else}}your chosen market{{/if}}, we've prepared some tailored incorporation options for your review."
+- "For your business aiming for {{#if strategicObjectives}}{{strategicObjectives.[0]}}{{else}}growth{{/if}}{{#if region}} in {{{region}}}{{/if}}, we've outlined these recommendations."
+- "Here are some incorporation options based on your stated needs and objectives."
 `,
 });
 
@@ -56,9 +57,15 @@ const generateRecommendationIntroFlow = ai.defineFlow(
   async input => {
     // Fallback if all inputs are somehow empty, though UI should prevent this.
     if (!input.region && (!input.businessActivities || input.businessActivities.length === 0) && (!input.strategicObjectives || input.strategicObjectives.length === 0)) {
-        return { introText: "Here are some incorporation options based on your stated needs and objectives:" };
+        return { introText: "Here are some incorporation options based on your stated needs and objectives." };
     }
     const {output} = await prompt(input);
-    return output || { introText: "Here are some incorporation options tailored to your needs:" }; // Fallback
+    let intro = output?.introText || "Here are some incorporation options tailored to your needs.";
+    // Ensure it doesn't end with a colon, even if AI adds one
+    if (intro.endsWith(':')) {
+      intro = intro.slice(0, -1);
+    }
+    return { introText: intro };
   }
 );
+
