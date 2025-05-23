@@ -10,7 +10,7 @@ import Step2ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails';
 import Step3ReviewPay from '@/components/wizard/steps/Step3ReviewPay';
 import Step4Confirmation from '@/components/wizard/steps/Step4Confirmation';
 import type { OrderData, OrderItem, IncorporationRecommendationItem, NeedsAssessment } from '@/lib/types';
-import { STEPS, INITIAL_ADDONS } from '@/lib/types';
+import { STEPS, INITIAL_ADDONS, USA_STATE_FEE, INTERNATIONAL_GOVERNMENT_FEE } from '@/lib/types';
 
 
 const initialOrderData: OrderData = {
@@ -26,7 +26,7 @@ const initialOrderData: OrderData = {
     jurisdiction: '',
     state: '',
     companyType: '',
-    price: 0,
+    price: 0, // This will be the base price of the jurisdiction/state/type combination
     packageName: '',
 
     aiBestRecommendation: null,
@@ -37,7 +37,7 @@ const initialOrderData: OrderData = {
     aiRecommendedCompanyType: '',
     aiRecommendedReasoning: '',
   },
-  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })), // Banking assistance is now part of addOns
+  addOns: INITIAL_ADDONS.map(addon => ({ ...addon })),
   companyNames: { firstChoice: '', secondChoice: '', thirdChoice: '' },
   directors: [{ id: `dir-${Date.now()}`, fullName: '', email: '' }],
   shareholders: [{ id: `sh-${Date.now()}`, fullNameOrEntityName: '', shareAllocation: '' }],
@@ -69,7 +69,6 @@ export default function WizardPage() {
       if (newPartialData.incorporation) {
         updatedData.incorporation = { ...prev.incorporation, ...newPartialData.incorporation };
       }
-      // BankingAssistance is removed as a top-level field
       if (newPartialData.needsAssessment) {
         updatedData.needsAssessment = { ...prev.needsAssessment, ...newPartialData.needsAssessment };
       }
@@ -91,8 +90,6 @@ export default function WizardPage() {
       if (newPartialData.billingAddress) {
         updatedData.billingAddress = { ...prev.billingAddress, ...newPartialData.billingAddress };
       }
-
-
       return updatedData;
     });
   }, []);
@@ -100,49 +97,75 @@ export default function WizardPage() {
   useEffect(() => {
     const items: OrderItem[] = [];
     const { incorporation, addOns, needsAssessment } = orderData;
+    const isUsaFocus = needsAssessment?.region === 'USA (Exclusive Focus)';
 
-    if (incorporation?.jurisdiction && incorporation.companyType && incorporation.price !== undefined) {
+    let governmentFeeAdded = false;
+
+    if (incorporation?.jurisdiction && incorporation.companyType && (isUsaFocus || incorporation.jurisdiction !== 'United States of America' || incorporation.state)) {
       let name = `${incorporation.jurisdiction}`;
       if (incorporation.jurisdiction === 'United States of America' && incorporation.state) {
-        const stateLabel = incorporation.state.split('-')[0];
+        const stateLabel = US_STATES_LIST.find(s => s.value === incorporation.state)?.label || incorporation.state.split('-')[0];
         name += ` (${stateLabel})`;
       }
       name += ` ${incorporation.companyType}`;
 
-      let totalIncorporationPrice = incorporation.price || 0;
+      let totalIncorporationServicePrice = incorporation.price || 0; // Base price
       let description = `Formation in ${incorporation.jurisdiction}.`;
 
       if (incorporation.packageName) {
-        const isUsaFocus = needsAssessment?.region === 'USA (Exclusive Focus)';
         const activePackages = isUsaFocus ? usaPackages : intlPackages;
         const pkg = activePackages.find(p => p.name === incorporation.packageName);
 
         if (pkg) {
           name += ` - ${incorporation.packageName} Package`;
-          totalIncorporationPrice += pkg.price; // Package price is added to base incorporation price
-          description += ` Includes ${incorporation.packageName} features. Recommended for your needs.`;
+          totalIncorporationServicePrice += pkg.price; // Package price is added to base incorporation price
+          description += ` Includes ${incorporation.packageName} features.`;
         }
       }
+      
+      // Add the main incorporation service item
+      items.push({
+        id: 'incorporation_service',
+        name: name,
+        price: totalIncorporationServicePrice,
+        quantity: 1,
+        description: description.trim(),
+      });
 
-      if (totalIncorporationPrice > 0 || (incorporation.price === 0 && incorporation.packageName) ) {
-         items.push({
-            id: 'incorporation_service',
-            name: name,
-            price: totalIncorporationPrice,
-            quantity: 1,
-            description: description.trim(),
-          });
-      }
+      // Add Government/State Fees conditionally
+      const feePrice = isUsaFocus || incorporation.jurisdiction === 'United States of America' ? USA_STATE_FEE : INTERNATIONAL_GOVERNMENT_FEE;
+      const feeName = isUsaFocus || incorporation.jurisdiction === 'United States of America' ? 'State Fees (USA)' : 'Government Fees';
+      items.push({
+          id: 'government_fees',
+          name: feeName,
+          price: feePrice,
+          quantity: 1,
+          description: `Mandatory fees for ${incorporation.jurisdiction} ${incorporation.state ? '(' + (US_STATES_LIST.find(s => s.value === incorporation.state)?.label || incorporation.state.split('-')[0]) + ')' : ''}.`,
+      });
+      governmentFeeAdded = true;
     }
 
-    // Banking assistance is now handled like other add-ons
+
     addOns?.forEach(addon => {
-      if (addon.selected && addon.price > 0) {
+      if (addon.selected) { // Price check removed, assuming selected add-ons will always have a price or 0
         items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.description || addon.name + ' service.'}` });
       }
     });
+    
+    // If government fees were not added because incorporation details were incomplete,
+    // but an old item exists, remove it.
+    if (!governmentFeeAdded) {
+        const feeIndex = items.findIndex(item => item.id === 'government_fees');
+        if (feeIndex > -1) {
+            items.splice(feeIndex, 1);
+        }
+    }
+
 
     setDerivedOrderItems(items);
+    // Update orderData.orderItems directly to ensure consistency if needed by other parts
+    // This might be slightly redundant if derivedOrderItems is always the source of truth for display
+    // but ensures orderData is complete.
     setOrderData(prev => ({ ...prev, orderItems: items }));
 
   }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region]);
@@ -176,11 +199,16 @@ export default function WizardPage() {
 
   const removeOrderItemHandler = useCallback((itemId: string) => {
     setOrderData(prevData => {
-        const newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
-        // No longer need special handling for bankingAssistance here
-
+        let newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
         let updatedAddOns = prevData.addOns;
-        if (itemId !== 'incorporation_service') { // Check if it's an add-on
+
+        // If the main incorporation service is removed, also remove government fees
+        if (itemId === 'incorporation_service') {
+            newItems = newItems.filter(item => item.id !== 'government_fees');
+        }
+        
+        // If an add-on is removed from the cart, unselect it in the addOns array
+        if (itemId !== 'incorporation_service' && itemId !== 'government_fees') {
              updatedAddOns = (prevData.addOns || []).map(addon =>
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );

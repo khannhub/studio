@@ -23,7 +23,7 @@ export interface IncorporationDetails {
   companyType?: string; // User's current selection
   price?: number; // Base price of the selected jurisdiction/state/companyType combination
 
-  packageName?: string; // e.g., 'Basic', 'Standard', 'Premium'
+  packageName?: string; // e.g., 'Basic', 'Standard', 'Premium' or 'Normal', 'Express', 'Super Urgent'
 
   aiBestRecommendation?: IncorporationRecommendationItem | null;
   aiAlternativeRecommendations?: IncorporationRecommendationItem[];
@@ -39,7 +39,7 @@ export interface AddOn {
   id: string;
   name: string;
   selected: boolean;
-  price: number;
+  price: number; // Actual price, "From $" is a display format
   description?: string; // Optional: for more details in accordion
 }
 
@@ -190,3 +190,8 @@ export const INTERNATIONAL_COMPANY_TYPES_LIST = [
   'Global Business Company', 'Authorised Company', 'Limited Liability Partnership',
   'Exempted Company', 'Corporation'
 ];
+
+// Fee Constants
+export const USA_STATE_FEE = 150;
+export const INTERNATIONAL_GOVERNMENT_FEE = 100;
+export const CUSTOM_INCORP_BASE_PRICE = 100; // Nominal starting price for custom configs
