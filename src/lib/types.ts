@@ -112,16 +112,16 @@ export interface OrderData {
   orderId?: string;
   orderStatus?: "success" | "pending" | "failed";
   paymentDate?: string;
-  orderItems?: OrderItem[];
+  // orderItems?: OrderItem[]; // Removed: items are derived
 }
 
 export interface StepComponentProps {
   orderData: OrderData;
   updateOrderData: (data: Partial<OrderData> | ((prevData: OrderData) => Partial<OrderData>)) => void;
-  orderItems: OrderItem[];
-  addOrderItem: (item: OrderItem) => void;
-  updateOrderItem: (itemId: string, updates: Partial<OrderItem>) => void;
-  removeOrderItem: (itemId: string) => void;
+  orderItems: OrderItem[]; // This will be derivedOrderItems from WizardPage state
+  // addOrderItem: (item: OrderItem) => void; // Removed
+  // updateOrderItem: (itemId: string, updates: Partial<OrderItem>) => void; // Removed
+  // removeOrderItem: (itemId: string) => void; // Removed, direct item manipulation isn't done by steps this way
   goToNextStep: () => void;
   goToPrevStep: () => void;
   goToStep: (step: number) => void;
@@ -199,3 +199,5 @@ export const INTERNATIONAL_COMPANY_TYPES_LIST = [
 export const USA_STATE_FEE = 150;
 export const INTERNATIONAL_GOVERNMENT_FEE = 100;
 export const CUSTOM_INCORP_BASE_PRICE = 100; // Nominal starting price for custom configs
+
+    

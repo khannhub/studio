@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -47,7 +46,7 @@ const initialOrderData: OrderData = {
   paymentMethod: undefined,
   orderId: '',
   orderStatus: undefined,
-  orderItems: [],
+  // orderItems: [], // Removed - items are derived into derivedOrderItems local state
 };
 
 
@@ -123,7 +122,7 @@ export default function WizardPage() {
           items.push({
             id: 'incorporation_package_tier',
             name: `${incorporation.packageName} ${isUsaExclusiveFocus ? 'Package' : 'Processing'}`,
-            price: pkg.price, // This price is now potentially randomized
+            price: pkg.price, 
             quantity: 1,
             description: pkg.features.join('; '),
           });
@@ -150,65 +149,42 @@ export default function WizardPage() {
     });
     
     setDerivedOrderItems(items);
-    // Also update orderData.orderItems for consistency if other parts of the app rely on it directly
-    updateOrderDataHandler(prev => ({ ...prev, orderItems: items }));
 
-  }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region, updateOrderDataHandler]);
+  }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region]);
 
 
-  const addOrderItemHandler = useCallback((item: OrderItem) => {
+  // Example of how item removal would work by modifying source data (addOns, incorporation)
+  // This is not directly wired to UI buttons in OrderSummary in this iteration.
+  const handleRemoveDerivedItem = useCallback((itemId: string) => {
     updateOrderDataHandler(prevData => {
-        const existingItems = prevData.orderItems || [];
-        const existingItemIndex = existingItems.findIndex(i => i.id === item.id);
-        let newItems;
-        if (existingItemIndex > -1) {
-            newItems = existingItems.map((i, idx) =>
-                idx === existingItemIndex ? { ...i, quantity: i.quantity + item.quantity, price: item.price, name: item.name, description: item.description } : i
-            );
-        } else {
-            newItems = [...existingItems, item];
-        }
-        return { ...prevData, orderItems: newItems };
-    });
-  }, [updateOrderDataHandler]);
-
-  const updateOrderItemHandler = useCallback((itemId: string, updates: Partial<OrderItem>) => {
-     updateOrderDataHandler(prevData => {
-        const newItems = (prevData.orderItems || []).map(item =>
-            item.id === itemId ? {...item, ...updates} : item
-        );
-        return { ...prevData, orderItems: newItems };
-     });
-  }, [updateOrderDataHandler]);
-
-
-  const removeOrderItemHandler = useCallback((itemId: string) => {
-    updateOrderDataHandler(prevData => {
-        let newItems = (prevData.orderItems || []).filter(item => item.id !== itemId);
-        let updatedAddOns = prevData.addOns || [];
-        let updatedIncorporation = { ...prevData.incorporation } as OrderData['incorporation'];
+        let updatedAddOns = prevData.addOns ? [...prevData.addOns] : [];
+        let updatedIncorporation = prevData.incorporation ? { ...prevData.incorporation } : {};
 
         if (itemId === 'incorporation_service') {
-            // If main service is removed, also remove related fees and package
-            newItems = newItems.filter(item => item.id !== 'government_fees' && item.id !== 'incorporation_package_tier');
-            if (updatedIncorporation) {
-                updatedIncorporation.packageName = undefined; // Clear package selection
-                updatedIncorporation.price = 0; // Clear base price
-                updatedIncorporation.jurisdiction = ''; // Clear selections
-                updatedIncorporation.state = '';
-                updatedIncorporation.companyType = '';
-            }
-        } else if (itemId === 'incorporation_package_tier' && updatedIncorporation) {
-            updatedIncorporation.packageName = undefined; // Clear package selection if package item is removed
-        }
-        
-        // If an add-on item is removed from the cart, deselect it in the addOns array
-        if (itemId !== 'incorporation_service' && itemId !== 'government_fees' && itemId !== 'incorporation_package_tier') {
-             updatedAddOns = (prevData.addOns || []).map(addon =>
+            // Clear main incorporation details, package. Fees will be removed by effect.
+            updatedIncorporation.jurisdiction = '';
+            updatedIncorporation.state = '';
+            updatedIncorporation.companyType = '';
+            updatedIncorporation.price = 0;
+            updatedIncorporation.packageName = undefined;
+        } else if (itemId === 'incorporation_package_tier') {
+            updatedIncorporation.packageName = undefined;
+        } else if (itemId === 'government_fees') {
+            // This item is purely derived. To "remove" it, clear the core incorporation.
+            // For simplicity, we can assume this is handled if 'incorporation_service' is removed.
+            // Or, if a specific "remove fees" button existed (it doesn't), it might also clear main details.
+             updatedIncorporation.jurisdiction = '';
+             updatedIncorporation.state = '';
+             updatedIncorporation.companyType = '';
+             updatedIncorporation.price = 0;
+             updatedIncorporation.packageName = undefined;
+        } else {
+            // Must be an add-on
+            updatedAddOns = (prevData.addOns || []).map(addon =>
                 addon.id === itemId ? { ...addon, selected: false } : addon
             );
         }
-        return { ...prevData, orderItems: newItems, addOns: updatedAddOns, incorporation: updatedIncorporation };
+        return { ...prevData, addOns: updatedAddOns, incorporation: updatedIncorporation as OrderData['incorporation'] };
     });
   }, [updateOrderDataHandler]);
 
@@ -239,9 +215,7 @@ export default function WizardPage() {
     orderData,
     updateOrderData: updateOrderDataHandler,
     orderItems: derivedOrderItems, // Pass derivedOrderItems to steps for display
-    addOrderItem: addOrderItemHandler,
-    updateOrderItem: updateOrderItemHandler,
-    removeOrderItem: removeOrderItemHandler,
+    // removeOrderItem: handleRemoveDerivedItem, // Not currently used by steps directly
     goToNextStep,
     goToPrevStep,
     goToStep,
@@ -273,3 +247,4 @@ export default function WizardPage() {
   );
 }
 
+    
