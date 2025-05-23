@@ -3,7 +3,7 @@
 
 import type { FC } from 'react';
 import { useState, useTransition, useEffect, useCallback } from 'react';
-import type { StepComponentProps, OrderData, IncorporationDetails, NeedsAssessment } from '@/lib/types';
+import type { StepComponentProps, OrderData, IncorporationDetails, NeedsAssessment, IncorporationRecommendationItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,6 +48,21 @@ const strategicObjectiveOptions = [
   { id: 'access_banking', value: 'Access Specific Banking', label: 'Banking Access', icon: <Banknote className="h-5 w-5 mb-2 text-primary" /> },
   { id: 'other_objective', value: 'Other Strategic Objective', label: 'Other Objective', icon: <Building className="h-5 w-5 mb-2 text-primary" /> },
 ];
+
+const assignStaticPriceToRecommendation = (rec: Omit<IncorporationRecommendationItem, 'price'>): number => {
+  // Example static pricing logic. In a real app, this would come from a database or config.
+  if (rec.jurisdiction === 'United States of America') {
+    if (rec.state === 'Delaware-DE' && rec.companyType === 'Limited Liability Company') return 199;
+    if (rec.state === 'Wyoming-WY' && rec.companyType === 'Limited Liability Company') return 149;
+    if (rec.state === 'California-CA' && rec.companyType === 'C Corporation') return 299;
+    return 249; // Default for other US states/types
+  }
+  if (rec.jurisdiction === 'Singapore' && rec.companyType === 'Private Limited Company') return 499;
+  if (rec.jurisdiction === 'British Virgin Islands' && rec.companyType === 'International Business Company') return 799;
+  if (rec.jurisdiction === 'Hong Kong' && rec.companyType === 'Limited by Shares') return 650;
+  
+  return 399; // Default for other international jurisdictions/types
+};
 
 
 const Step1DefineConfigure: FC<StepComponentProps> = ({
@@ -106,8 +121,8 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       !orderData.incorporation?.aiRecommendedReasoning || 
       JSON.stringify(lastSuccessfulAiCallInputs) !== JSON.stringify(currentNeeds);
 
-    if (!inputsHaveChangedOrNoRecExists) {
-      // Skip AI calls if inputs haven't changed and recommendations exist
+    if (!inputsHaveChangedOrNoRecExists && orderData.incorporation?.aiGeneratedIntroText) {
+      // Skip AI calls if inputs haven't changed and recommendations + intro text exist
       goToNextStep();
       return;
     }
@@ -123,38 +138,50 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           region: orderData.needsAssessment?.region || '',
           businessDescription: orderData.needsAssessment?.businessDescription || '',
         };
-        const recommendations: RecommendIncorporationOutput = await recommendIncorporation(recInput);
         
+        let recommendations: RecommendIncorporationOutput;
+        if (!inputsHaveChangedOrNoRecExists && orderData.incorporation?.aiBestRecommendation) {
+            // Use existing recommendations if inputs haven't changed
+            recommendations = {
+                bestRecommendation: orderData.incorporation.aiBestRecommendation,
+                alternativeRecommendations: orderData.incorporation.aiAlternativeRecommendations || [],
+            };
+        } else {
+            recommendations = await recommendIncorporation(recInput);
+        }
+        
+        const pricedBestRec = { ...recommendations.bestRecommendation, price: assignStaticPriceToRecommendation(recommendations.bestRecommendation) };
+        const pricedAltRecs = recommendations.alternativeRecommendations.map(rec => ({ ...rec, price: assignStaticPriceToRecommendation(rec) }));
+
         const introInput: GenerateRecommendationIntroInput = {
           region: orderData.needsAssessment?.region,
           businessActivities: orderData.needsAssessment?.businessActivities,
           strategicObjectives: orderData.needsAssessment?.strategicObjectives,
         };
         const intro: GenerateRecommendationIntroOutput = await generateRecommendationIntro(introInput);
-
-        const bestRec = recommendations.bestRecommendation;
         
         updateOrderData(prev => {
           let newIncorporationDetails: IncorporationDetails = {
             ...(prev.incorporation as IncorporationDetails),
-            jurisdiction: bestRec.jurisdiction,
-            state: bestRec.state,
-            companyType: bestRec.companyType,
-            price: bestRec.price,
+            jurisdiction: pricedBestRec.jurisdiction,
+            state: pricedBestRec.state,
+            companyType: pricedBestRec.companyType,
+            price: pricedBestRec.price, // Base price from best recommendation
             
-            aiBestRecommendation: { ...bestRec, isBestPick: true },
-            aiAlternativeRecommendations: recommendations.alternativeRecommendations.map(alt => ({...alt, isBestPick: false})),
+            aiBestRecommendation: pricedBestRec,
+            aiAlternativeRecommendations: pricedAltRecs,
             
-            aiRecommendedJurisdiction: bestRec.jurisdiction,
-            aiRecommendedState: bestRec.state,
-            aiRecommendedCompanyType: bestRec.companyType,
-            aiRecommendedReasoning: bestRec.reasoning,
+            aiRecommendedJurisdiction: pricedBestRec.jurisdiction, // Store original AI choices
+            aiRecommendedState: pricedBestRec.state,
+            aiRecommendedCompanyType: pricedBestRec.companyType,
+            aiRecommendedReasoning: pricedBestRec.reasoning,
             aiGeneratedIntroText: intro.introText,
           };
 
+          // If primary region is USA, ensure jurisdiction is set correctly
           if (recInput.region === 'USA (Exclusive Focus)') {
               newIncorporationDetails.jurisdiction = 'United States of America';
-              newIncorporationDetails.state = bestRec.state; 
+              // The state is already set by the AI recommendation or will be handled in Step 2
           }
           
           return {
@@ -345,3 +372,4 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
+

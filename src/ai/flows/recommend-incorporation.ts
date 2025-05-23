@@ -40,7 +40,7 @@ const SingleRecommendationSchema = z.object({
   reasoning: z
     .string()
     .describe('The reasoning behind this specific recommendation (jurisdiction, state if applicable, company type). Use markdown bold syntax (**text**) to highlight the most important phrases or key ideas. For the "bestRecommendation", provide more detailed reasoning (3-4 sentences). For "alternativeRecommendations", keep reasoning concise (2-3 sentences). Maintain a formal and business-targeted tone.'),
-  price: z.number().int().min(100).max(1000).describe('A base price (integer between 100 and 1000 USD) for setting up this specific incorporation (jurisdiction, state if applicable, and company type). Example: 499.'), // Adjusted price range
+  price: z.number().int().min(0).describe('A placeholder for the base price (integer). This will be overridden by the application with a static price. AI should focus on the recommendation, not the price value itself.'),
 });
 
 const RecommendIncorporationOutputSchema = z.object({
@@ -60,8 +60,8 @@ export async function recommendIncorporation(
   // Ensure the best pick has the flag, and others don't
   return {
       ...result,
-      bestRecommendation: { ...result.bestRecommendation, isBestPick: true } as IncorporationRecommendationItem,
-      alternativeRecommendations: result.alternativeRecommendations.map(alt => ({...alt, isBestPick: false}))
+      bestRecommendation: { ...result.bestRecommendation, isBestPick: true, price: 0 } as IncorporationRecommendationItem, // Price set to 0, will be overridden
+      alternativeRecommendations: result.alternativeRecommendations.map(alt => ({...alt, isBestPick: false, price: 0})) // Price set to 0, will be overridden
   };
 }
 
@@ -78,6 +78,7 @@ const prompt = ai.definePrompt({
   prompt: `You are an expert international business incorporation advisor.
 Based on the user's business activities, strategic objectives, and primary region of operation, provide one 'bestRecommendation' and exactly three 'alternativeRecommendations' for incorporation.
 Ensure all 'reasoning' text is formal, professional, and targeted towards a business audience.
+The 'price' field in your output schema is a placeholder; you do not need to determine a financial price. Focus on making the best recommendation.
 
 User Inputs:
   Business Activities:
@@ -105,7 +106,7 @@ Output Structure for EACH recommendation (bestRecommendation and each of the 3 a
   -   'companyType': If 'jurisdiction' is "United States of America", MUST be chosen from 'US Company Types'. Otherwise, MUST be chosen from 'International Company Types'. If region is 'USA (Exclusive Focus)', companyType MUST be from 'US Company Types'.
   -   'shortDescription': A very brief (10-15 words) tagline or key feature summary for this specific recommendation.
   -   'reasoning': For the 'bestRecommendation', provide comprehensive reasoning (3-4 sentences). For 'alternativeRecommendations', provide concise reasoning (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure reasoning is formal and business-like.
-  -   'price': An estimated base price (integer between 100 and 1000 USD) for this specific incorporation. Example: 499. This price is for the core incorporation service only, before any packages or government fees.
+  -   'price': Set this to 0. The application will assign a static price.
 
 Specific Instructions:
 1.  **Primary Region "USA (Exclusive Focus)"**:
@@ -115,9 +116,8 @@ Specific Instructions:
 2.  **Other Primary Regions**:
     *   If 'Region of Operation' is not "USA (Exclusive Focus)", you can recommend any suitable jurisdiction from the 'Jurisdictions' list for all recommendations, including "United States of America" (with a state and US company type) if it's a strong strategic fit. The 'bestRecommendation' can be any suitable jurisdiction.
 3.  **Distinct Recommendations**: Ensure the 'bestRecommendation' and all three 'alternativeRecommendations' are distinct from each other in terms of (jurisdiction, state, companyType) combination.
-4.  **Pricing**: Provide a realistic base 'price' (between 100 and 1000 USD) for each of the four recommendations.
-5.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure the tone is formal and business-like.
-6.  **"Other" Options**: If "Other Business Activity" is present in the 'Business Activities' list, or "Other Strategic Objective" is in the 'Strategic Objectives' list, refer to the 'Business Description' field for user's elaboration on these "Other" items and incorporate this understanding into your recommendations.
+4.  **Reasoning Length & Highlighting**: Ensure the 'bestRecommendation' has more detailed reasoning (3-4 sentences) than the alternatives (2-3 sentences). Use markdown bold syntax (**text**) to highlight key phrases or ideas in all reasonings. Ensure the tone is formal and business-like.
+5.  **"Other" Options**: If "Other Business Activity" is present in the 'Business Activities' list, or "Other Strategic Objective" is in the 'Strategic Objectives' list, refer to the 'Business Description' field for user's elaboration on these "Other" items and incorporate this understanding into your recommendations.
 
 Generate the 'bestRecommendation' and 'alternativeRecommendations' according to the schema.
   `,
