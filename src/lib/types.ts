@@ -1,4 +1,3 @@
-
 export interface OrderItem {
   id: string;
   name: string;
@@ -84,7 +83,7 @@ export interface NeedsAssessment {
   region?: string;
   businessActivities?: string[];
   strategicObjectives?: string[];
-  businessDescription?: string; 
+  businessDescription?: string;
 }
 
 export interface OrderData {
@@ -131,6 +130,7 @@ export interface StepComponentProps {
 }
 
 export const STEPS = [
+  { id: 0, name: 'Welcome', path: 'welcome' },
   { id: 1, name: 'Define Needs', path: 'define' },
   { id: 2, name: 'Select Services', path: 'services' },
   { id: 3, name: 'Provide Details', path: 'details' },
@@ -199,5 +199,3 @@ export const INTERNATIONAL_COMPANY_TYPES_LIST = [
 export const USA_STATE_FEE = 150;
 export const INTERNATIONAL_GOVERNMENT_FEE = 100;
 export const CUSTOM_INCORP_BASE_PRICE = 100; // Nominal starting price for custom configs
-
-    
