@@ -1,16 +1,14 @@
-import type { FC } from 'react';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, HelpCircle, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { HelpCircle, Save } from 'lucide-react';
+import Image from 'next/image';
+import type { FC } from 'react';
 
 interface AppHeaderProps {
   title: string;
-  onToggleSummary: () => void;
-  orderItemCount: number;
 }
 
-const AppHeader: FC<AppHeaderProps> = ({ title, onToggleSummary, orderItemCount }) => {
+const AppHeader: FC<AppHeaderProps> = ({ title }) => {
   const { toast } = useToast();
   const logoUrl = "https://d21l9vkgwnizti.cloudfront.net/uploads/one-ibc-logo.svg";
 
@@ -36,14 +34,6 @@ const AppHeader: FC<AppHeaderProps> = ({ title, onToggleSummary, orderItemCount 
           <Button variant="outline" size="sm" onClick={handleSaveExit}>
             <Save className="mr-2 h-4 w-4" />
             Save & Exit
-          </Button>
-          <Button variant="outline" size="icon" onClick={onToggleSummary} aria-label="View Order Summary" className="relative">
-            <ShoppingCart className="h-5 w-5" />
-            {orderItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                {orderItemCount}
-              </span>
-            )}
           </Button>
         </nav>
       </div>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 interface TypingTextProps {
   text: string;

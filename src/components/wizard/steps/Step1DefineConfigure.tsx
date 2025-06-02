@@ -1,20 +1,18 @@
-
 'use client';
 
-import type { FC } from 'react';
-import { useState, useTransition, useEffect, useCallback } from 'react';
-import type { StepComponentProps, OrderData, IncorporationDetails, NeedsAssessment, IncorporationRecommendationItem } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox'; 
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, Wand2, ChevronRight, User, PhoneIcon, Globe, Flag, MountainSnow, Landmark as EuropeLandmark, Palmtree, Wheat, Sprout, Pyramid, Container, Users as UsersIcon, LibraryBig, Copyright, ShoppingCart, CandlestickChart, PiggyBank, Briefcase, Target as TargetIcon, ShieldCheck, PlaneTakeoff, Coins, SlidersHorizontal, EyeOff, Banknote, Search, TrendingUp, Building, DollarSign } from 'lucide-react';
-import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
 import { generateRecommendationIntro, type GenerateRecommendationIntroInput, type GenerateRecommendationIntroOutput } from '@/ai/flows/generate-recommendation-intro';
+import { recommendIncorporation, type RecommendIncorporationInput, type RecommendIncorporationOutput } from '@/ai/flows/recommend-incorporation';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import type { IncorporationDetails, IncorporationRecommendationItem, NeedsAssessment, StepComponentProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { Banknote, Briefcase, Building, CandlestickChart, ChevronLeft, ChevronRight, Coins, Container, Copyright, Landmark as EuropeLandmark, EyeOff, Flag, Globe, LibraryBig, Loader2, MountainSnow, Palmtree, PiggyBank, PlaneTakeoff, Pyramid, ShieldCheck, ShoppingCart, SlidersHorizontal, Sprout, Target as TargetIcon, Users as UsersIcon, Wand2, Wheat } from 'lucide-react';
+import type { FC } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 
 const regionOptions = [
   { id: 'usa_exclusive', value: 'USA (Exclusive Focus)', label: 'USA (Exclusive Focus)', icon: <Flag className="h-5 w-5 mb-2 text-primary" /> },
@@ -60,7 +58,7 @@ const assignStaticPriceToRecommendation = (rec: Omit<IncorporationRecommendation
   if (rec.jurisdiction === 'Singapore' && rec.companyType === 'Private Limited Company') return 499;
   if (rec.jurisdiction === 'British Virgin Islands' && rec.companyType === 'International Business Company') return 799;
   if (rec.jurisdiction === 'Hong Kong' && rec.companyType === 'Limited by Shares') return 650;
-  
+
   return 399; // Default for other international jurisdictions/types
 };
 
@@ -69,6 +67,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   orderData,
   updateOrderData,
   goToNextStep,
+  goToPrevStep,
   isLoading: isGlobalLoading,
   setIsLoading: setGlobalIsLoading,
 }) => {
@@ -104,8 +103,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
 
   const handleGetRecommendationAndProceed = () => {
-    if (!orderData.userEmail || !orderData.userPhone || !orderData.needsAssessment?.region || (orderData.needsAssessment?.businessActivities || []).length === 0 || (orderData.needsAssessment?.strategicObjectives || []).length === 0 ) {
-      toast({ title: "Missing Information", description: "Please complete all required fields to get recommendations.", variant: "destructive" });
+    if (!orderData.needsAssessment?.region || (orderData.needsAssessment?.businessActivities || []).length === 0 || (orderData.needsAssessment?.strategicObjectives || []).length === 0) {
+      toast({
+        title: "Hold Up!",
+        description: "Looks like we're missing some key details. Please tell us your target region, main business activities, and strategic goals.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -115,10 +118,10 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       strategicObjectives: orderData.needsAssessment.strategicObjectives,
       businessDescription: orderData.needsAssessment.businessDescription,
     };
-    
-    const inputsHaveChangedOrNoRecExists = 
-      !lastSuccessfulAiCallInputs || 
-      !orderData.incorporation?.aiRecommendedReasoning || 
+
+    const inputsHaveChangedOrNoRecExists =
+      !lastSuccessfulAiCallInputs ||
+      !orderData.incorporation?.aiRecommendedReasoning ||
       JSON.stringify(lastSuccessfulAiCallInputs) !== JSON.stringify(currentNeeds);
 
     if (!inputsHaveChangedOrNoRecExists && orderData.incorporation?.aiGeneratedIntroText) {
@@ -126,10 +129,10 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
       goToNextStep();
       return;
     }
-    
+
     setIsAiLoading(true);
     setGlobalIsLoading(true);
-    
+
     startTransition(async () => {
       try {
         const recInput: RecommendIncorporationInput = {
@@ -138,18 +141,18 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           region: orderData.needsAssessment?.region || '',
           businessDescription: orderData.needsAssessment?.businessDescription || '',
         };
-        
+
         let recommendations: RecommendIncorporationOutput;
         if (!inputsHaveChangedOrNoRecExists && orderData.incorporation?.aiBestRecommendation) {
-            // Use existing recommendations if inputs haven't changed
-            recommendations = {
-                bestRecommendation: orderData.incorporation.aiBestRecommendation,
-                alternativeRecommendations: orderData.incorporation.aiAlternativeRecommendations || [],
-            };
+          // Use existing recommendations if inputs haven't changed
+          recommendations = {
+            bestRecommendation: orderData.incorporation.aiBestRecommendation,
+            alternativeRecommendations: orderData.incorporation.aiAlternativeRecommendations || [],
+          };
         } else {
-            recommendations = await recommendIncorporation(recInput);
+          recommendations = await recommendIncorporation(recInput);
         }
-        
+
         const pricedBestRec = { ...recommendations.bestRecommendation, price: assignStaticPriceToRecommendation(recommendations.bestRecommendation) };
         const pricedAltRecs = recommendations.alternativeRecommendations.map(rec => ({ ...rec, price: assignStaticPriceToRecommendation(rec) }));
 
@@ -159,7 +162,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           strategicObjectives: orderData.needsAssessment?.strategicObjectives,
         };
         const intro: GenerateRecommendationIntroOutput = await generateRecommendationIntro(introInput);
-        
+
         updateOrderData(prev => {
           let newIncorporationDetails: IncorporationDetails = {
             ...(prev.incorporation as IncorporationDetails),
@@ -167,10 +170,10 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
             state: pricedBestRec.state,
             companyType: pricedBestRec.companyType,
             price: pricedBestRec.price, // Base price from best recommendation
-            
+
             aiBestRecommendation: pricedBestRec,
             aiAlternativeRecommendations: pricedAltRecs,
-            
+
             aiRecommendedJurisdiction: pricedBestRec.jurisdiction, // Store original AI choices
             aiRecommendedState: pricedBestRec.state,
             aiRecommendedCompanyType: pricedBestRec.companyType,
@@ -180,23 +183,30 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 
           // If primary region is USA, ensure jurisdiction is set correctly
           if (recInput.region === 'USA (Exclusive Focus)') {
-              newIncorporationDetails.jurisdiction = 'United States of America';
-              // The state is already set by the AI recommendation or will be handled in Step 2
+            newIncorporationDetails.jurisdiction = 'United States of America';
+            // The state is already set by the AI recommendation or will be handled in Step 2
           }
-          
+
           return {
             ...prev,
             incorporation: newIncorporationDetails,
           };
         });
 
-        setLastSuccessfulAiCallInputs(currentNeeds); 
-        toast({ title: "Recommendations Ready!", description: "We've prepared recommendations. Proceed to the next step to review."});
+        setLastSuccessfulAiCallInputs(currentNeeds);
+        toast({
+          title: "Insights Unlocked!",
+          description: "Great! We've analyzed your needs and have some tailored incorporation suggestions for you. Let's explore them!"
+        });
         goToNextStep();
 
       } catch (error) {
         console.error("Error during recommendation process:", error);
-        toast({ title: "Recommendation Failed", description: "Could not process recommendations. Please check your input or try again.", variant: "destructive" });
+        toast({
+          title: "Oops, a Hiccup!",
+          description: "We hit a snag while generating recommendations. Please ensure all fields are filled correctly, or try rephrasing your business description. If the issue persists, our support team is ready to help!",
+          variant: "destructive"
+        });
       } finally {
         setIsAiLoading(false);
         setGlobalIsLoading(false);
@@ -221,7 +231,7 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           htmlFor={`${groupName}-${option.id}`}
           className={cn(
             "flex flex-col items-center justify-center text-center p-3 sm:p-4 border rounded-lg cursor-pointer transition-all duration-200 ease-in-out",
-            "hover:-translate-y-1 hover:shadow-lg", 
+            "hover:-translate-y-1 hover:shadow-lg",
             selectedValue === option.value ? 'border-primary ring-2 ring-primary shadow-md' : 'border-border hover:border-primary/70'
           )}
         >
@@ -272,81 +282,46 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
   const needsAssessment = orderData.needsAssessment || {};
 
   const isProceedButtonDisabled =
-      isGlobalLoading ||
-      isAiLoading ||
-      isPending ||
-      !isEmailValid ||
-      !isPhoneValid ||
-      !needsAssessment.region ||
-      (needsAssessment.businessActivities || []).length === 0 ||
-      (needsAssessment.strategicObjectives || []).length === 0;
+    isGlobalLoading ||
+    isAiLoading ||
+    isPending ||
+    !needsAssessment.region ||
+    (needsAssessment.businessActivities || []).length === 0 ||
+    (needsAssessment.strategicObjectives || []).length === 0;
 
   return (
     <div className="space-y-8">
       <div className="space-y-6 py-2">
         <h2 className="text-xl font-semibold mb-1 flex items-center">
-           Your Contact Information
-        </h2>
-        <p className="text-sm text-muted-foreground mb-4">Please provide your primary contact details.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-          <div>
-            <Label htmlFor="email" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary"/> Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={orderData.userEmail || ''}
-              onChange={(e) => updateOrderData({ userEmail: e.target.value })}
-              className="mt-1"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="phone" className="flex items-center"><PhoneIcon className="mr-2 h-4 w-4 text-primary"/> Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="+1 (555) 123-4567"
-              value={orderData.userPhone || ''}
-              onChange={(e) => updateOrderData({ userPhone: e.target.value })}
-              className="mt-1"
-              required
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-6 py-2">
-        <h2 className="text-xl font-semibold mb-1 flex items-center">
-           Understanding Your Needs
+          Understanding Your Needs
         </h2>
         <p className="text-sm text-muted-foreground mb-4">Tell us about your business to help us recommend the best options.</p>
-        
+
         <div className="space-y-6">
           <div>
             <Label className="text-base font-medium">
-                Primary target markets/regions?
+              Primary target markets/regions?
             </Label>
             {renderSelectionCards(regionOptions, needsAssessment.region, (value) => handleNeedsAssessmentChange('region', value), 'region')}
           </div>
 
           <div>
             <Label className="text-base font-medium">
-                 Company's main business activity? (Select all that apply)
+              Company's main business activity? (Select all that apply)
             </Label>
             {renderMultiSelectCards(businessActivityOptions, needsAssessment.businessActivities, (value) => handleMultiSelectChange(needsAssessment.businessActivities, value, 'businessActivities'), 'businessActivities')}
           </div>
 
           <div>
             <Label className="text-base font-medium">
-                 Main strategic objectives? (Select all that apply)
+              Main strategic objectives? (Select all that apply)
             </Label>
             {renderMultiSelectCards(strategicObjectiveOptions, needsAssessment.strategicObjectives, (value) => handleMultiSelectChange(needsAssessment.strategicObjectives, value, 'strategicObjectives'), 'strategicObjectives')}
           </div>
-          
+
           <div>
             <Label htmlFor="businessDescription" className="text-base font-medium">
-                 Briefly describe your business (optional).
+              Briefly describe your business (optional).
             </Label>
             <Textarea
               id="businessDescription"
@@ -358,8 +333,12 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
           </div>
         </div>
       </div>
-      
-      <div className="flex justify-end items-center mt-8 pt-6 border-t">
+
+      <div className="flex justify-between items-center mt-8 pt-6 border-t">
+        <Button variant="outline" onClick={goToPrevStep} disabled={isAiLoading || isPending || isGlobalLoading}>
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Previous
+        </Button>
         <Button onClick={handleGetRecommendationAndProceed} disabled={isProceedButtonDisabled} className="w-full md:w-auto">
           {(isAiLoading || isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {!isAiLoading && !isPending && <Wand2 className="mr-2 h-4 w-4" />}
@@ -372,4 +351,3 @@ const Step1DefineConfigure: FC<StepComponentProps> = ({
 };
 
 export default Step1DefineConfigure;
-

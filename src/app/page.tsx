@@ -1,15 +1,15 @@
-
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
 import WizardLayout from '@/components/wizard/WizardLayout';
+import Step0Welcome from '@/components/wizard/steps/Step0Welcome';
 import Step1DefineConfigure from '@/components/wizard/steps/Step1DefineConfigure';
-import Step2SelectServices, { incorporationPackages as usaPackages, processingTimePackages as intlPackages } from '@/components/wizard/steps/Step2SelectServices';
 import Step3ProvideDetails from '@/components/wizard/steps/Step2ProvideDetails'; // Corrected path
-import Step4ReviewPay from '@/components/wizard/steps/Step3ReviewPay';          // Corrected path
-import Step5Confirmation from '@/components/wizard/steps/Step4Confirmation';    // Corrected path
-import type { OrderData, OrderItem, IncorporationRecommendationItem, NeedsAssessment } from '@/lib/types';
-import { STEPS, INITIAL_ADDONS, USA_STATE_FEE, INTERNATIONAL_GOVERNMENT_FEE, US_STATES_LIST } from '@/lib/types';
+import Step2SelectServices, { processingTimePackages as intlPackages, incorporationPackages as usaPackages } from '@/components/wizard/steps/Step2SelectServices';
+import Step4ReviewPay from '@/components/wizard/steps/Step3ReviewPay'; // Corrected path
+import Step5Confirmation from '@/components/wizard/steps/Step4Confirmation'; // Corrected path
+import type { NeedsAssessment, OrderData, OrderItem } from '@/lib/types';
+import { INITIAL_ADDONS, INTERNATIONAL_GOVERNMENT_FEE, STEPS, US_STATES_LIST, USA_STATE_FEE } from '@/lib/types';
+import { useCallback, useEffect, useState } from 'react';
 
 
 const initialOrderData: OrderData = {
@@ -25,7 +25,7 @@ const initialOrderData: OrderData = {
     jurisdiction: '',
     state: '',
     companyType: '',
-    price: 0, 
+    price: 0,
     packageName: '',
     aiBestRecommendation: null,
     aiAlternativeRecommendations: [],
@@ -51,7 +51,7 @@ const initialOrderData: OrderData = {
 
 
 export default function WizardPage() {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [orderData, setOrderData] = useState<OrderData>(initialOrderData);
   const [derivedOrderItems, setDerivedOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,13 +76,13 @@ export default function WizardPage() {
       if (newPartialData.directors) {
         updatedData.directors = newPartialData.directors;
       }
-       if (newPartialData.shareholders) {
+      if (newPartialData.shareholders) {
         updatedData.shareholders = newPartialData.shareholders;
       }
       if (newPartialData.primaryContact) {
         updatedData.primaryContact = { ...prev.primaryContact, ...newPartialData.primaryContact };
       }
-       if (newPartialData.deliveryAddress) {
+      if (newPartialData.deliveryAddress) {
         updatedData.deliveryAddress = { ...prev.deliveryAddress, ...newPartialData.deliveryAddress };
       }
       if (newPartialData.billingAddress) {
@@ -104,7 +104,7 @@ export default function WizardPage() {
         incName += ` (${stateLabel})`;
       }
       incName += ` ${incorporation.companyType} Formation`;
-      
+
       // Main incorporation service item (base price from selection)
       items.push({
         id: 'incorporation_service',
@@ -122,32 +122,32 @@ export default function WizardPage() {
           items.push({
             id: 'incorporation_package_tier',
             name: `${incorporation.packageName} ${isUsaExclusiveFocus ? 'Package' : 'Processing'}`,
-            price: pkg.price, 
+            price: pkg.price,
             quantity: 1,
             description: pkg.features.join('; '),
           });
         }
       }
-      
+
       // Add Government/State Fees as a separate item
       const feePrice = isUsaExclusiveFocus || incorporation.jurisdiction === 'United States of America' ? USA_STATE_FEE : INTERNATIONAL_GOVERNMENT_FEE;
       const feeName = isUsaExclusiveFocus || incorporation.jurisdiction === 'United States of America' ? 'State Fees (USA)' : 'Government Fees';
       items.push({
-          id: 'government_fees',
-          name: feeName,
-          price: feePrice,
-          quantity: 1,
-          description: `Mandatory fees for ${incorporation.jurisdiction} ${incorporation.state ? '(' + (US_STATES_LIST.find(s => s.value === incorporation.state)?.label || incorporation.state.split('-')[0]) + ')' : ''}.`,
+        id: 'government_fees',
+        name: feeName,
+        price: feePrice,
+        quantity: 1,
+        description: `Mandatory fees for ${incorporation.jurisdiction} ${incorporation.state ? '(' + (US_STATES_LIST.find(s => s.value === incorporation.state)?.label || incorporation.state.split('-')[0]) + ')' : ''}.`,
       });
     }
 
 
     addOns?.forEach(addon => {
-      if (addon.selected) { 
+      if (addon.selected) {
         items.push({ id: addon.id, name: addon.name, price: addon.price, quantity: 1, description: `${addon.description || addon.name + ' service.'}` });
       }
     });
-    
+
     setDerivedOrderItems(items);
 
   }, [orderData.incorporation, orderData.addOns, orderData.needsAssessment?.region]);
@@ -157,54 +157,54 @@ export default function WizardPage() {
   // This is not directly wired to UI buttons in OrderSummary in this iteration.
   const handleRemoveDerivedItem = useCallback((itemId: string) => {
     updateOrderDataHandler(prevData => {
-        let updatedAddOns = prevData.addOns ? [...prevData.addOns] : [];
-        let updatedIncorporation = prevData.incorporation ? { ...prevData.incorporation } : {};
+      let updatedAddOns = prevData.addOns ? [...prevData.addOns] : [];
+      let updatedIncorporation = prevData.incorporation ? { ...prevData.incorporation } : {};
 
-        if (itemId === 'incorporation_service') {
-            // Clear main incorporation details, package. Fees will be removed by effect.
-            updatedIncorporation.jurisdiction = '';
-            updatedIncorporation.state = '';
-            updatedIncorporation.companyType = '';
-            updatedIncorporation.price = 0;
-            updatedIncorporation.packageName = undefined;
-        } else if (itemId === 'incorporation_package_tier') {
-            updatedIncorporation.packageName = undefined;
-        } else if (itemId === 'government_fees') {
-            // This item is purely derived. To "remove" it, clear the core incorporation.
-            // For simplicity, we can assume this is handled if 'incorporation_service' is removed.
-            // Or, if a specific "remove fees" button existed (it doesn't), it might also clear main details.
-             updatedIncorporation.jurisdiction = '';
-             updatedIncorporation.state = '';
-             updatedIncorporation.companyType = '';
-             updatedIncorporation.price = 0;
-             updatedIncorporation.packageName = undefined;
-        } else {
-            // Must be an add-on
-            updatedAddOns = (prevData.addOns || []).map(addon =>
-                addon.id === itemId ? { ...addon, selected: false } : addon
-            );
-        }
-        return { ...prevData, addOns: updatedAddOns, incorporation: updatedIncorporation as OrderData['incorporation'] };
+      if (itemId === 'incorporation_service') {
+        // Clear main incorporation details, package. Fees will be removed by effect.
+        updatedIncorporation.jurisdiction = '';
+        updatedIncorporation.state = '';
+        updatedIncorporation.companyType = '';
+        updatedIncorporation.price = 0;
+        updatedIncorporation.packageName = undefined;
+      } else if (itemId === 'incorporation_package_tier') {
+        updatedIncorporation.packageName = undefined;
+      } else if (itemId === 'government_fees') {
+        // This item is purely derived. To "remove" it, clear the core incorporation.
+        // For simplicity, we can assume this is handled if 'incorporation_service' is removed.
+        // Or, if a specific "remove fees" button existed (it doesn't), it might also clear main details.
+        updatedIncorporation.jurisdiction = '';
+        updatedIncorporation.state = '';
+        updatedIncorporation.companyType = '';
+        updatedIncorporation.price = 0;
+        updatedIncorporation.packageName = undefined;
+      } else {
+        // Must be an add-on
+        updatedAddOns = (prevData.addOns || []).map(addon =>
+          addon.id === itemId ? { ...addon, selected: false } : addon
+        );
+      }
+      return { ...prevData, addOns: updatedAddOns, incorporation: updatedIncorporation as OrderData['incorporation'] };
     });
   }, [updateOrderDataHandler]);
 
 
   const goToNextStep = useCallback(() => {
-    if (currentStep < STEPS.length) {
+    if (currentStep < STEPS.length - 1) {
       setCurrentStep(prev => prev + 1);
       window.scrollTo(0, 0);
     }
   }, [currentStep]);
 
   const goToPrevStep = useCallback(() => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
       window.scrollTo(0, 0);
     }
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= STEPS.length) {
+    if (step >= 0 && step < STEPS.length) {
       setCurrentStep(step);
       window.scrollTo(0, 0);
     }
@@ -226,18 +226,19 @@ export default function WizardPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
+      case 0: return <Step0Welcome {...stepProps} />;
       case 1: return <Step1DefineConfigure {...stepProps} />;
       case 2: return <Step2SelectServices {...stepProps} />;
       case 3: return <Step3ProvideDetails {...stepProps} />;
       case 4: return <Step4ReviewPay {...stepProps} />;
       case 5: return <Step5Confirmation {...stepProps} />;
-      default: return <Step1DefineConfigure {...stepProps} />;
+      default: return <Step0Welcome {...stepProps} />;
     }
   };
 
   return (
     <WizardLayout
-      currentStep={currentStep}
+      currentStep={currentStep + 1}
       totalSteps={STEPS.length}
       stepNames={STEPS.map(s => s.name)}
       orderItems={derivedOrderItems} // Pass derivedOrderItems to WizardLayout for summary
@@ -246,5 +247,3 @@ export default function WizardPage() {
     </WizardLayout>
   );
 }
-
-    

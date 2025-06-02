@@ -1,67 +1,60 @@
-import type { FC } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetClose } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import type { OrderItem } from '@/lib/types';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { X } from 'lucide-react';
+import type { FC } from 'react';
 
 interface OrderSummaryProps {
-  isOpen: boolean;
-  onClose: () => void;
   items: OrderItem[];
+  alwaysShow?: boolean;
 }
 
-const OrderSummary: FC<OrderSummaryProps> = ({ isOpen, onClose, items }) => {
+const OrderSummary: FC<OrderSummaryProps> = ({ items }) => {
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-md flex flex-col">
-        <SheetHeader className="mb-4">
-          <SheetTitle>Order Summary</SheetTitle>
-          <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </SheetClose>
-        </SheetHeader>
-        
-        <ScrollArea className="flex-grow pr-6 -mr-6 mb-4"> {/* Added padding for scrollbar */}
+    <Card className="shadow-lg rounded-xl flex flex-col h-full max-h-[calc(100vh-10rem)]">
+      <CardHeader className="border-b">
+        <CardTitle className="text-xl">Order Summary</CardTitle>
+      </CardHeader>
+
+      <ScrollArea className="flex-grow">
+        <CardContent className="py-4 px-6">
           {items.length === 0 ? (
-            <p className="text-muted-foreground">Your order is currently empty.</p>
+            <p className="text-muted-foreground py-4 text-center">Your order is currently empty.</p>
           ) : (
             <ul className="space-y-3">
               {items.map((item) => (
-                <li key={item.id} className="flex justify-between items-start text-sm p-3 bg-accent/30 rounded-md">
+                <li key={item.id} className="flex justify-between items-start text-sm p-3 bg-muted/50 dark:bg-muted/20 rounded-lg shadow-sm">
                   <div>
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
-                     {item.quantity > 1 && <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>}
+                    <p className="font-medium text-foreground leading-tight">{item.name}</p>
+                    {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                    {item.quantity > 1 && <p className="text-xs text-muted-foreground mt-0.5">Quantity: {item.quantity}</p>}
                   </div>
-                  <p className="font-semibold text-foreground whitespace-nowrap">
+                  <p className="font-semibold text-foreground whitespace-nowrap pl-3">
                     ${(item.price * item.quantity).toFixed(2)}
                   </p>
                 </li>
               ))}
             </ul>
           )}
-        </ScrollArea>
-        
-        <Separator className="my-4" />
-        
-        <SheetFooter className="mt-auto">
-          <div className="w-full space-y-2">
-            <div className="flex justify-between text-lg font-semibold">
-              <span>Total Due:</span>
-              <span>${total.toFixed(2)}</span>
+        </CardContent>
+      </ScrollArea>
+
+      {items.length > 0 && (
+        <>
+          <Separator />
+          <CardFooter className="py-4 px-6 mt-auto">
+            <div className="w-full space-y-3">
+              <div className="flex justify-between text-lg font-semibold">
+                <span>Total Due:</span>
+                <span>${total.toFixed(2)}</span>
+              </div>
             </div>
-            <Button className="w-full" onClick={onClose} disabled={items.length === 0}>
-              Continue Order
-            </Button>
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          </CardFooter>
+        </>
+      )}
+    </Card>
   );
 };
 
