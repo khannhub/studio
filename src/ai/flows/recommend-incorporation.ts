@@ -10,9 +10,9 @@
  * - RecommendIncorporationOutput - The return type for the recommendIncorporation function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-import { JURISDICTIONS_LIST, US_STATES_LIST, US_COMPANY_TYPES_LIST, INTERNATIONAL_COMPANY_TYPES_LIST, type IncorporationRecommendationItem } from '@/lib/types';
+import { ai } from '@/ai/genkit';
+import { INTERNATIONAL_COMPANY_TYPES_LIST, JURISDICTIONS_LIST, US_COMPANY_TYPES_LIST, US_STATES_LIST, type IncorporationRecommendationItem } from '@/lib/types';
+import { z } from 'genkit';
 
 const RecommendIncorporationInputSchema = z.object({
   businessActivities: z
@@ -134,4 +134,3 @@ const recommendIncorporationFlow = ai.defineFlow(
     return output!;
   }
 );
-

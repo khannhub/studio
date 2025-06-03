@@ -8,8 +8,8 @@
  * - SummarizeBusinessDescriptionOutput - The return type for the summarizeBusinessDescription function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const SummarizeBusinessDescriptionInputSchema = z.object({
   businessDescription: z

@@ -3,6 +3,7 @@
 import type { OrderItem } from '@/lib/types';
 import { STEPS } from '@/lib/types'; // Import STEPS to get total length for last step calculation
 import type { FC, ReactNode } from 'react';
+import GlobalLoadingOverlay from '../common/GlobalLoadingOverlay'; // Import the new component
 import AppHeader from './AppHeader';
 import OrderSummary from './OrderSummary';
 import ProgressBar from './ProgressBar';
@@ -14,6 +15,8 @@ interface WizardLayoutProps {
   stepNames: string[];
   orderItems: OrderItem[];
   appTitle?: string;
+  onLogoClick?: () => void;
+  isGlobalLoading?: boolean; // Add new prop for global loading state
 }
 
 const WizardLayout: FC<WizardLayoutProps> = ({
@@ -23,6 +26,8 @@ const WizardLayout: FC<WizardLayoutProps> = ({
   stepNames,
   orderItems,
   appTitle = "IBC Swift Start",
+  onLogoClick,
+  isGlobalLoading = false, // Destructure with a default value
 }) => {
   // Convert 1-indexed currentStep from props to 0-indexed for logic
   const currentStepZeroIndexed = currentStep - 1;
@@ -34,8 +39,10 @@ const WizardLayout: FC<WizardLayoutProps> = ({
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <GlobalLoadingOverlay isLoading={isGlobalLoading} /> {/* Render the overlay */}
       <AppHeader
         title={appTitle}
+        onLogoClick={onLogoClick}
       />
       <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <ProgressBar currentStep={currentStep} totalSteps={totalSteps} stepNames={stepNames} />

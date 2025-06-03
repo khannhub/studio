@@ -241,7 +241,9 @@ export default function WizardPage() {
       currentStep={currentStep + 1}
       totalSteps={STEPS.length}
       stepNames={STEPS.map(s => s.name)}
-      orderItems={derivedOrderItems} // Pass derivedOrderItems to WizardLayout for summary
+      orderItems={derivedOrderItems}
+      onLogoClick={() => goToStep(0)}
+      isGlobalLoading={isLoading}
     >
       {renderStepContent()}
     </WizardLayout>

@@ -8,8 +8,8 @@
  * - GenerateRecommendationIntroOutput - The return type.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const GenerateRecommendationIntroInputSchema = z.object({
   region: z.string().optional().describe("The user's primary region of operation."),

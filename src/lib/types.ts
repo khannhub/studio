@@ -38,12 +38,18 @@ export interface IncorporationDetails {
 export interface AddOn {
   id: string;
   name: string;
+  description: string;
+  price: number;
   selected: boolean;
-  price: number; // Actual price, "From $" is a display format
-  description?: string; // Optional: for more details in accordion
-  // Fields for banking assistance if merged
-  preferredCurrency?: string;
-  preferredBankingRegion?: string;
+  requiresDetails?: boolean;
+  recommendationReasoning?: string | null; // For AI-driven suggestions
+
+  // Fields for specific add-ons, make them optional
+  preferredCurrency?: string;         // For Banking Assistance
+  preferredBankingRegion?: string;    // For Banking Assistance
+  mailForwardingPreference?: string;  // For Virtual Office (e.g., 'none', 'scan_email', 'physical_monthly')
+  trademarkName?: string;             // For Trademark Registration
+  // Add other specific fields as new add-ons with details are introduced
 }
 
 export interface CompanyNameChoices {
@@ -91,17 +97,17 @@ export interface OrderData {
   userPhone?: string;
   needsAssessment?: NeedsAssessment;
   incorporation?: IncorporationDetails;
-  addOns?: AddOn[];
+  addOns: AddOn[];
 
   companyNames?: CompanyNameChoices;
   directors?: Person[];
   shareholders?: ShareholderInfo[];
-  primaryContact?: Person & { isSameAsDirectorId?: string };
+  primaryContact?: Person & { phone?: string }; // Combined Person with optional phone
   deliveryAddress?: Address;
   extraRequests?: string;
 
-  billingAddress?: Address & { useDeliveryAddress?: boolean; usePrimaryContactAddress?: boolean; };
-  paymentMethod?: "card" | "paypal" | "bank_transfer";
+  billingAddress?: Address & { useDeliveryAddress?: boolean, usePrimaryContactAddress?: boolean };
+  paymentMethod?: 'card' | 'paypal' | 'bank_transfer' | 'none_required'; // Added none_required
   paymentDetails?: {
     cardNumber?: string;
     expiryDate?: string;
@@ -109,7 +115,7 @@ export interface OrderData {
   };
 
   orderId?: string;
-  orderStatus?: "success" | "pending" | "failed";
+  orderStatus?: 'pending' | 'success' | 'failed' | 'completed_free'; // Added completed_free
   paymentDate?: string;
   // orderItems?: OrderItem[]; // Removed: items are derived
 }
