@@ -237,37 +237,27 @@ const Step2SelectServices: FC<StepComponentProps> = ({
 
   // Trigger AI Addon recommendations when key incorporation details change
   useEffect(() => {
-    const { jurisdiction, state, companyType, packageName } = orderData.incorporation || {};
-    const needs = orderData.needsAssessment;
+    // const { jurisdiction, state, companyType, packageName } = orderData.incorporation || {};
+    // const needs = orderData.needsAssessment;
 
-    if (jurisdiction && needs) {
-      const currentInputsKey = JSON.stringify({
-        jurisdiction,
-        state,
-        companyType,
-        packageName,
-        needsAssessment: needs, // Stringify the needs object to compare its content
-      });
+    // if (jurisdiction && needs) {
+    //   const currentInputsKey = JSON.stringify({
+    //     jurisdiction,
+    //     state,
+    //     companyType,
+    //     packageName,
+    //     needsAssessment: needs, // Stringify the needs object to compare its content
+    //   });
 
-      if (currentInputsKey !== lastRecommendationInputsRef.current) {
-        fetchAndApplyRecommendedAddons({
-          mainServiceDetails: { jurisdiction, state, companyType, packageName },
-          userNeeds: needs
-        }).finally(() => {
-          // Update the ref after the call, regardless of success or failure of the AI call itself,
-          // to prevent re-fetching with the exact same inputs if this effect re-runs before state settles.
-          lastRecommendationInputsRef.current = currentInputsKey;
-        });
-      }
-    }
-  }, [
-    orderData.incorporation?.jurisdiction,
-    orderData.incorporation?.state,
-    orderData.incorporation?.companyType,
-    orderData.incorporation?.packageName,
-    orderData.needsAssessment, // Re-run if needsAssessment object reference changes
-    fetchAndApplyRecommendedAddons // Now a stable dependency
-  ]);
+    //   if (currentInputsKey !== lastRecommendationInputsRef.current) {
+    //     lastRecommendationInputsRef.current = currentInputsKey;
+    //     fetchAndApplyRecommendedAddons({
+    //       mainServiceDetails: { jurisdiction, state, companyType, packageName },
+    //       userNeeds: needs,
+    //     });
+    //   }
+    // }
+  }, [orderData.incorporation, orderData.needsAssessment, fetchAndApplyRecommendedAddons]);
 
   useEffect(() => {
     const primaryRegionIsUSAEntry = orderData.needsAssessment?.region === 'USA (Exclusive Focus)';
@@ -517,6 +507,10 @@ const Step2SelectServices: FC<StepComponentProps> = ({
   };
   const packageSectionTitle = isPrimaryRegionUSA ? "Select Incorporation Package" : "Select Processing Time";
   const openAccordionItemsForAddons = useMemo(() => (orderData.addOns || []).filter(a => a.selected).map(a => a.id), [orderData.addOns]);
+
+  const isManualConfigComplete = useMemo(() => {
+    // ... existing code ...
+  }, [orderData.incorporation]);
 
   return (
     <div className="space-y-6">
